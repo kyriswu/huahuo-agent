@@ -18,7 +18,11 @@ export interface MilvusSearchClient {
  * plugged in later.
  */
 export class MilvusSearchProvider implements KnowledgeSearchProvider {
-  constructor(private readonly client: MilvusSearchClient) {}
+  private readonly client: MilvusSearchClient;
+
+  constructor(client: MilvusSearchClient) {
+    this.client = client;
+  }
 
   search(query: SearchQuery): Promise<SearchCandidate[]> {
     return this.client.search({

@@ -97,7 +97,8 @@ function classifyError(error: unknown): MilvusErrorKind {
 export function safeMilvusMessage(error: unknown): string {
   const message = errorText(error)
     .replace(/(password|passwd|token|authorization)\s*[:=]\s*\S+/gi, '$1=[redacted]')
-    .replace(/\broot:[^@\s]+@/gi, 'root:[redacted]@');
+    .replace(/\b(root|admin|user):[^\s]+@/gi, '$1:[redacted]@')
+    .replace(/\b(postgres(?:ql)?|https?):\/\/[^\s/:@]+:[^\s@]+@/gi, '$1://[redacted]@');
   return message.slice(0, 300);
 }
 

@@ -16,6 +16,7 @@ const options = {
   apiKey: 'test-key',
   model: 'test-model',
   dimensions: 3,
+  sendDimensions: true,
   timeoutMs: 100,
   maxRetries: 0,
 };
@@ -46,7 +47,26 @@ describe('OpenAICompatibleEmbeddingClient', () => {
     expect(JSON.parse(String(request?.body))).toMatchObject({
       model: 'test-model',
       input: ['one', 'two'],
+      encoding_format: 'float',
       dimensions: 3,
+    });
+  });
+
+  it('can validate dimensions without sending an unsupported dimensions field', async () => {
+    let request: RequestInit | undefined;
+    const client = new OpenAICompatibleEmbeddingClient({
+      ...options,
+      sendDimensions: false,
+      fetchImpl: async (_url, init) => {
+        request = init;
+        return response({ data: [{ embedding: [0.1, 0.2, 0.3] }] });
+      },
+    });
+    await expect(client.embed(['one'])).resolves.toEqual([[0.1, 0.2, 0.3]]);
+    expect(JSON.parse(String(request?.body))).toEqual({
+      model: 'test-model',
+      input: ['one'],
+      encoding_format: 'float',
     });
   });
 
@@ -63,6 +83,19 @@ describe('OpenAICompatibleEmbeddingClient', () => {
       code: 'EMBEDDING_PROVIDER_UNAVAILABLE',
     });
     expect(calls).toBe(1);
+  });
+
+  it('does not echo provider error details that could contain credentials or input text', async () => {
+    const secret = 'super-secret-key';
+    const client = new OpenAICompatibleEmbeddingClient({
+      ...options,
+      apiKey: secret,
+      fetchImpl: async () => response({
+        error: { message: `authorization: Bearer ${secret}; input: sensitive document text` },
+      }, 400),
+    });
+    await expect(client.embed(['sensitive document text'])).rejects.toThrow('HTTP 400');
+    await expect(client.embed(['sensitive document text'])).rejects.not.toThrow(secret);
   });
 
   it('retries a transient provider response a finite number of times', async () => {

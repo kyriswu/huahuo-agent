@@ -28,6 +28,14 @@ describe('chunkMarkdown', () => {
     expect(first[0]?.contentHash).toHaveLength(64);
   });
 
+  it('keeps heading paths dense when Markdown skips a heading level', () => {
+    const chunks = chunkMarkdown({
+      ...defaults,
+      content: '# Top\n\n### Deep\n\nBody',
+    });
+    expect(chunks.at(-1)?.headingPath).toEqual(['Top', 'Deep']);
+  });
+
   it('handles Chinese, English, and mixed content with explicit estimated token counts', () => {
     const chunks = chunkMarkdown({
       ...defaults,
@@ -48,6 +56,8 @@ describe('chunkMarkdown', () => {
     expect(chunks.length).toBeGreaterThan(1);
     expect(chunks.every((chunk) => chunk.tokenCount <= 10)).toBe(true);
     expect(chunks[1]?.text).toContain('eight');
+    expect(chunks.every((chunk) => chunk.startOffset >= 0 && chunk.endOffset > chunk.startOffset)).toBe(true);
+    expect(chunks[1]?.startOffset).toBeLessThan(chunks[0]?.endOffset ?? 0);
   });
 
   it('keeps fenced code in one block when it fits', () => {

@@ -8,20 +8,21 @@ import {
   type FieldType,
   type MilvusClient,
 } from '@zilliz/milvus2-sdk-node';
-import type { IndexVersionKey, RAGChunkRow } from '../../extensions/huahuo/rag/types.ts';
+import type {
+  IndexVersionKey,
+  RAGChunkRow,
+  RagChunkRepositoryPort,
+} from '../../extensions/huahuo/rag/types.ts';
 import { RagError } from '../../extensions/huahuo/rag/errors.ts';
+
+/** Backward-compatible adapter export; application code uses the domain port. */
+export type RagChunkRepository = RagChunkRepositoryPort;
 
 export const RAG_COLLECTION_NAME = 'huahuo_chunks';
 export const RAG_VECTOR_FIELD = 'embedding';
 export const RAG_INDEX_NAME = 'huahuo_chunks_embedding_hnsw_cosine';
 const MAX_WAIT_MS = 30_000;
 const POLL_INTERVAL_MS = 250;
-
-export interface RagChunkRepository {
-  ensureReady(vectorDimensions: number): Promise<void>;
-  upsertChunks(rows: RAGChunkRow[]): Promise<void>;
-  countVersionChunks(key: IndexVersionKey, state: RAGChunkRow['documentVersionState']): Promise<number>;
-}
 
 export function createRagChunkSchema(vectorDimensions: number): FieldType[] {
   if (!Number.isInteger(vectorDimensions) || vectorDimensions <= 0) {
@@ -33,6 +34,7 @@ export function createRagChunkSchema(vectorDimensions: number): FieldType[] {
     { name: 'owner_id', data_type: DataType.VarChar, max_length: 256 },
     { name: 'knowledge_base_id', data_type: DataType.VarChar, max_length: 256 },
     { name: 'source_id', data_type: DataType.VarChar, max_length: 256 },
+    { name: 'run_id', data_type: DataType.VarChar, max_length: 128 },
     { name: 'source_type', data_type: DataType.VarChar, max_length: 32 },
     { name: 'title', data_type: DataType.VarChar, max_length: 512 },
     { name: 'document_id', data_type: DataType.VarChar, max_length: 256 },
@@ -42,12 +44,16 @@ export function createRagChunkSchema(vectorDimensions: number): FieldType[] {
     { name: 'pipeline_version', data_type: DataType.VarChar, max_length: 128 },
     { name: 'chunker_version', data_type: DataType.VarChar, max_length: 128 },
     { name: 'document_version_state', data_type: DataType.VarChar, max_length: 16 },
-    { name: 'heading_path', data_type: DataType.JSON },
+    // The 2.6.17 Node SDK rejects JSON fields during collection creation
+    // (even though newer Milvus servers can store JSON). Keep these derived
+    // values as compact JSON strings until the SDK/server contract is
+    // explicitly upgraded and re-validated.
+    { name: 'heading_path', data_type: DataType.VarChar, max_length: 4096 },
     { name: 'text', data_type: DataType.VarChar, max_length: 16_384 },
     { name: 'embedding_model', data_type: DataType.VarChar, max_length: 256 },
     { name: 'embedding_dimensions', data_type: DataType.Int32 },
     { name: 'created_at', data_type: DataType.Int64 },
-    { name: 'metadata', data_type: DataType.JSON },
+    { name: 'metadata', data_type: DataType.VarChar, max_length: 16_384 },
     { name: RAG_VECTOR_FIELD, data_type: DataType.FloatVector, dim: vectorDimensions },
   ];
 }
@@ -113,16 +119,36 @@ function schemaMismatches(fields: FieldSchema[], dimensions: number, dynamicFiel
     if (expectedDim !== undefined && Number(fieldParam(actual, 'dim')) !== expectedDim) {
       mismatches.push(`${expectedField.name}: dim=${String(fieldParam(actual, 'dim'))}, expected=${expectedDim}`);
     }
+    if (expectedField.is_primary_key !== undefined && Boolean(actual.is_primary_key) !== expectedField.is_primary_key) {
+      mismatches.push(`${expectedField.name}: is_primary_key=${String(actual.is_primary_key)}, expected=${String(expectedField.is_primary_key)}`);
+    }
+    if (expectedField.autoID !== undefined && Boolean(actual.autoID) !== expectedField.autoID) {
+      mismatches.push(`${expectedField.name}: autoID=${String(actual.autoID)}, expected=${String(expectedField.autoID)}`);
+    }
   }
   const expectedNames = new Set(expected.map((field) => field.name));
   const unexpected = fields.filter((field) => !expectedNames.has(field.name)).map((field) => field.name);
   if (unexpected.length > 0) mismatches.push(`unexpected fields=${unexpected.join(',')}`);
+  const primaryFields = fields.filter((field) => field.is_primary_key).map((field) => field.name);
+  if (primaryFields.length !== 1 || primaryFields[0] !== 'chunk_id') {
+    mismatches.push(`primary_fields=${primaryFields.join(',')}, expected=chunk_id`);
+  }
   if (dynamicField) mismatches.push('enable_dynamic_field=true, expected=false');
   return mismatches;
 }
 
 function escapeFilterValue(value: string): string {
   return value.replaceAll('\\', '\\\\').replaceAll('"', '\\"');
+}
+
+function serializeJsonString(value: unknown, fieldName: string): string {
+  try {
+    const serialized = JSON.stringify(value);
+    if (typeof serialized !== 'string') throw new Error('empty serialization');
+    return serialized;
+  } catch (error) {
+    throw new RagError('INGEST_FAILED', `${fieldName} is not JSON serializable`, { cause: error });
+  }
 }
 
 function versionFilter(key: IndexVersionKey, state?: RAGChunkRow['documentVersionState']): string {
@@ -163,16 +189,29 @@ async function waitForLoad(client: MilvusClient, collection: string): Promise<vo
   throw new RagError('MILVUS_UNAVAILABLE', 'Timed out waiting for formal RAG collection load', { retryable: true });
 }
 
-export class MilvusRagRepository implements RagChunkRepository {
-  constructor(
-    private readonly client: MilvusClient,
-    private readonly collection = RAG_COLLECTION_NAME,
-  ) {}
+export class MilvusRagRepository implements RagChunkRepositoryPort {
+  private readonly client: MilvusClient;
+  private readonly collection: string;
 
-  async ensureReady(vectorDimensions: number): Promise<void> {
+  constructor(
+    client: MilvusClient,
+    collection = RAG_COLLECTION_NAME,
+  ) {
+    this.client = client;
+    this.collection = collection;
+  }
+
+  async ensureReady(vectorDimensions: number, options: { createIfMissing?: boolean } = {}): Promise<void> {
     const exists = await this.client.hasCollection({ collection_name: this.collection });
     ensureSuccess(exists, 'hasCollection');
     if (!exists.value) {
+      if (options.createIfMissing === false) {
+        throw new RagError(
+          'MILVUS_UNAVAILABLE',
+          `Formal RAG collection ${this.collection} does not exist; run the explicit initialization command first`,
+          { retryable: false },
+        );
+      }
       const created = await this.client.createCollection({
         collection_name: this.collection,
         enable_dynamic_field: false,
@@ -197,11 +236,22 @@ export class MilvusRagRepository implements RagChunkRepository {
 
     const indexes = await this.client.describeIndex({ collection_name: this.collection, field_name: RAG_VECTOR_FIELD });
     const indexCode = responseCode(indexes);
-    const matching = indexCode.toLowerCase().includes('indexnotexist')
+    const indexReason = responseReason(indexes);
+    const indexMissing = indexCode.toLowerCase().includes('indexnotexist')
+      || indexReason.toLowerCase().includes('indexnotexist');
+    if (indexCode !== 'Success' && indexCode !== '0' && !indexMissing) {
+      throw new RagError(
+        'MILVUS_UNAVAILABLE',
+        `describeIndex failed (${indexCode})${indexReason ? `: ${indexReason}` : ''}`,
+        { retryable: true },
+      );
+    }
+    const matching = indexMissing
       ? undefined
       : indexes.index_descriptions?.find((index) => {
-          const params = Object.fromEntries(index.params.map((pair) => [pair.key, pair.value]));
-          return params.index_type === IndexType.HNSW && params.metric_type === MetricType.COSINE;
+          const params = Object.fromEntries((index.params ?? []).map((pair) => [pair.key, pair.value]));
+          return String(params.index_type).toUpperCase() === String(IndexType.HNSW).toUpperCase()
+            && String(params.metric_type).toUpperCase() === String(MetricType.COSINE).toUpperCase();
         });
     if (!matching && indexes.index_descriptions?.length) {
       throw new RagError('MILVUS_SCHEMA_INCOMPATIBLE', 'Formal RAG vector index is not HNSW + COSINE');
@@ -233,6 +283,7 @@ export class MilvusRagRepository implements RagChunkRepository {
         owner_id: row.ownerId,
         knowledge_base_id: row.knowledgeBaseId,
         source_id: row.sourceId,
+        run_id: row.runId ?? 'application',
         source_type: row.sourceType,
         title: row.title,
         document_id: row.documentId,
@@ -242,12 +293,12 @@ export class MilvusRagRepository implements RagChunkRepository {
         pipeline_version: row.pipelineVersion,
         chunker_version: row.chunkerVersion,
         document_version_state: row.documentVersionState,
-        heading_path: row.headingPath,
+        heading_path: serializeJsonString(row.headingPath, 'heading_path'),
         text: row.text,
         embedding_model: row.embeddingModel,
         embedding_dimensions: row.embeddingDimensions,
         created_at: Date.now(),
-        metadata: row.metadata ?? {},
+        metadata: serializeJsonString(row.metadata ?? {}, 'metadata'),
         embedding: row.embedding,
       })),
     });

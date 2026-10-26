@@ -15,16 +15,29 @@
     "milvus:poc": "node --experimental-strip-types --env-file-if-exists=.env scripts/milvus-poc.ts",
     "rag:test": "vitest run",
     "rag:ingest:mock": "node --experimental-strip-types --env-file-if-exists=.env scripts/rag-ingest-mock.ts",
-    "rag:milvus:init": "node --experimental-strip-types --env-file-if-exists=.env scripts/rag-milvus-init.ts"
+    "rag:milvus:init": "node --experimental-strip-types --env-file-if-exists=.env scripts/rag-milvus-init.ts",
+    "rag:ingest": "node --experimental-strip-types --env-file-if-exists=.env scripts/rag-ingest.ts",
+    "rag:embedding:check": "node --experimental-strip-types --env-file-if-exists=.env scripts/rag-embedding-check.ts",
+    "rag:state:migrate": "node --experimental-strip-types --env-file-if-exists=.env scripts/rag-state-migrate.ts",
+    "rag:state:process-check": "node --experimental-strip-types --env-file-if-exists=.env scripts/rag-state-process-check.ts",
+    "rag:recovery:run": "node --experimental-strip-types --env-file-if-exists=.env scripts/rag-recovery-run.ts",
+    "rag:reconcile": "node --experimental-strip-types --env-file-if-exists=.env scripts/rag-reconcile.ts",
+    "rag:acceptance:dense:mock": "node --experimental-strip-types --env-file-if-exists=.env scripts/rag-acceptance-dense.ts --mode=mock",
+    "rag:acceptance:dense": "node --experimental-strip-types --env-file-if-exists=.env scripts/rag-acceptance-dense.ts"
   },
   "dependencies": {
-    "@mastra/core": "1.78.0",
+    "@ai-sdk/openai-compatible": "2.0.85",
+    "@mastra/core": "1.79.0",
+    "@mastra/memory": "1.39.0",
+    "@mastra/pg": "1.32.0",
     "@zilliz/milvus2-sdk-node": "2.6.17",
+    "pg": "^8.16.3",
     "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/node": "^26.0.0",
-    "mastra": "1.34.2",
+    "@types/pg": "^8.15.5",
+    "mastra": "1.35.0",
     "typescript": "^5.9.2",
     "vitest": "5.0.5"
   }

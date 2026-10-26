@@ -11,6 +11,7 @@ export interface HuahuoRagConfig {
   chunking: RagChunkingConfig;
   ingest: RagIngestConfig;
   ragCollection: string;
+  stateDatabaseUrl?: string;
   searchMode: SearchMode;
   rerank: {
     enabled: boolean;
@@ -25,6 +26,10 @@ export interface RagEmbeddingConfig {
   apiKey?: string;
   model?: string;
   dimensions?: number;
+  /** Some providers (including SiliconFlow BGE-M3) do not accept this request field. */
+  sendDimensions: boolean;
+  /** Model input limit used for safety checks; it is not a tokenizer. */
+  maxInputTokens: number;
   timeoutMs: number;
   maxRetries: number;
 }
@@ -45,6 +50,7 @@ export interface RagRuntimeConfig {
   chunking: RagChunkingConfig;
   ingest: RagIngestConfig;
   ragCollection: string;
+  stateDatabaseUrl?: string;
   searchMode: SearchMode;
   rerank: HuahuoRagConfig['rerank'];
 }
@@ -61,6 +67,32 @@ function positiveInteger(
     throw new RagConfigurationError(`${name} must be a positive integer`);
   }
   return value;
+}
+
+function nonNegativeInteger(
+  env: NodeJS.ProcessEnv,
+  name: string,
+  fallback: number,
+): number {
+  const raw = env[name]?.trim();
+  if (!raw) return fallback;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 0) {
+    throw new RagConfigurationError(`${name} must be a non-negative integer`);
+  }
+  return value;
+}
+
+function booleanValue(
+  env: NodeJS.ProcessEnv,
+  name: string,
+  fallback: boolean,
+): boolean {
+  const raw = env[name]?.trim().toLowerCase();
+  if (!raw) return fallback;
+  if (raw === 'true') return true;
+  if (raw === 'false') return false;
+  throw new RagConfigurationError(`${name} must be "true" or "false"`);
 }
 
 function optionalDimensions(env: NodeJS.ProcessEnv): number | undefined {
@@ -81,8 +113,8 @@ export function loadRagConfig(env: NodeJS.ProcessEnv = process.env): RagRuntimeC
   }
 
   const maxTokens = positiveInteger(env, 'RAG_CHUNK_SIZE', 800);
-  const overlapTokens = Number(env.RAG_CHUNK_OVERLAP?.trim() || 120);
-  if (!Number.isInteger(overlapTokens) || overlapTokens < 0 || overlapTokens >= maxTokens) {
+  const overlapTokens = nonNegativeInteger(env, 'RAG_CHUNK_OVERLAP', 120);
+  if (overlapTokens >= maxTokens) {
     throw new RagConfigurationError('RAG_CHUNK_OVERLAP must be an integer smaller than RAG_CHUNK_SIZE');
   }
   const tokenCountStrategy = env.RAG_TOKEN_COUNT_STRATEGY?.trim() || 'heuristic-v1';
@@ -96,13 +128,10 @@ export function loadRagConfig(env: NodeJS.ProcessEnv = process.env): RagRuntimeC
       ...(env.RAG_EMBEDDING_API_KEY ? { apiKey: env.RAG_EMBEDDING_API_KEY } : {}),
       ...(env.RAG_EMBEDDING_MODEL ? { model: env.RAG_EMBEDDING_MODEL.trim() } : {}),
       ...(optionalDimensions(env) !== undefined ? { dimensions: optionalDimensions(env) } : {}),
-      timeoutMs: positiveInteger(env, 'RAG_EMBEDDING_TIMEOUT_MS', 10_000),
-      maxRetries: Number.isInteger(Number(env.RAG_EMBEDDING_MAX_RETRIES ?? 2))
-        && Number(env.RAG_EMBEDDING_MAX_RETRIES ?? 2) >= 0
-        ? Number(env.RAG_EMBEDDING_MAX_RETRIES ?? 2)
-        : (() => {
-            throw new RagConfigurationError('RAG_EMBEDDING_MAX_RETRIES must be a non-negative integer');
-          })(),
+      sendDimensions: booleanValue(env, 'RAG_EMBEDDING_SEND_DIMENSIONS', false),
+      maxInputTokens: positiveInteger(env, 'RAG_EMBEDDING_MAX_INPUT_TOKENS', 8_192),
+      timeoutMs: positiveInteger(env, 'RAG_EMBEDDING_TIMEOUT_MS', 30_000),
+      maxRetries: nonNegativeInteger(env, 'RAG_EMBEDDING_MAX_RETRIES', 2),
     },
     chunking: { maxTokens, overlapTokens, tokenCountStrategy },
     ingest: {
@@ -110,6 +139,7 @@ export function loadRagConfig(env: NodeJS.ProcessEnv = process.env): RagRuntimeC
       pipelineVersion: env.RAG_INDEX_PIPELINE_VERSION?.trim() || 'v1',
     },
     ragCollection: env.RAG_MILVUS_COLLECTION?.trim() || 'huahuo_chunks',
+    ...(env.RAG_STATE_DATABASE_URL ? { stateDatabaseUrl: env.RAG_STATE_DATABASE_URL.trim() } : {}),
     searchMode,
     rerank: {
       enabled: env.RAG_RERANK_ENABLED === 'true',

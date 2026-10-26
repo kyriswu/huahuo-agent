@@ -1,6 +1,9 @@
 export class UnsupportedSearchModeError extends Error {
-  constructor(public readonly mode: string) {
+  public readonly mode: string;
+
+  constructor(mode: string) {
     super(`Search mode "${mode}" is not available in the configured provider`);
+    this.mode = mode;
     this.name = 'UnsupportedSearchModeError';
   }
 }
@@ -50,6 +53,9 @@ export class EmbeddingConfigurationError extends RagError {
 }
 
 export class EmbeddingProviderError extends RagError {
+  kind: 'authentication' | 'rate_limit' | 'server' | 'invalid_request' | 'network' | 'timeout' | 'response' = 'response';
+  httpStatus?: number;
+
   constructor(
     code: 'EMBEDDING_PROVIDER_UNAVAILABLE' | 'EMBEDDING_PROVIDER_TIMEOUT' | 'EMBEDDING_RESPONSE_INVALID',
     message: string,

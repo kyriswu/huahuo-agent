@@ -2,4 +2,7 @@ node_modules/
 dist/
 .mastra/
 .env
+.env.*
+!.env.example
 *.log
+artifacts/rag-acceptance/

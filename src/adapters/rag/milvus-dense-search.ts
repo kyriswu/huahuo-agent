@@ -8,6 +8,8 @@ export interface DenseSearchQuery {
   vector: number[];
   limit?: number;
   runId?: string;
+  /** Optional trusted adapter-generated predicate for document/version checks. */
+  filter?: string;
 }
 
 export interface DenseSearchResult {
@@ -16,6 +18,8 @@ export interface DenseSearchResult {
   sourceId: string;
   score: number;
   runId: string;
+  documentId?: string;
+  documentVersion?: string;
 }
 
 export interface MilvusDenseSearchOptions {
@@ -23,10 +27,18 @@ export interface MilvusDenseSearchOptions {
   vectorDim: number;
   vectorField?: string;
   searchEf?: number;
+  idField?: string;
+  contentField?: string;
+  sourceIdField?: string;
+  runIdField?: string;
+  documentIdField?: string;
+  documentVersionField?: string;
 }
 
 type SearchResponse = {
   status?: { error_code?: unknown; reason?: unknown };
+  error_code?: unknown;
+  reason?: unknown;
   results?: Array<Record<string, unknown>>;
 };
 
@@ -46,8 +58,10 @@ function escapeMilvusString(value: string): string {
 
 function responseStatus(response: SearchResponse): { code: string; reason?: string } {
   return {
-    code: String(response.status?.error_code ?? 'Success'),
-    ...(response.status?.reason ? { reason: String(response.status.reason) } : {}),
+    code: String(response.status?.error_code ?? response.error_code ?? 'Success'),
+    ...((response.status?.reason ?? response.reason) ? {
+      reason: String(response.status?.reason ?? response.reason),
+    } : {}),
   };
 }
 
@@ -56,6 +70,11 @@ function asString(value: unknown, field: string): string {
     throw new Error(`Milvus search result field "${field}" is missing or not a string`);
   }
   return value;
+}
+
+function asOptionalString(value: unknown, field: string): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  return asString(value, field);
 }
 
 function asScore(value: unknown): number {
@@ -70,15 +89,31 @@ function asScore(value: unknown): number {
  * Query embedding is intentionally supplied by the caller.
  */
 export class MilvusDenseSearchAdapter {
+  private readonly client: MilvusClient;
+  private readonly options: MilvusDenseSearchOptions;
   private readonly vectorField: string;
   private readonly searchEf: number;
+  private readonly idField: string;
+  private readonly contentField: string;
+  private readonly sourceIdField: string;
+  private readonly runIdField: string;
+  private readonly documentIdField?: string;
+  private readonly documentVersionField?: string;
 
   constructor(
-    private readonly client: MilvusClient,
-    private readonly options: MilvusDenseSearchOptions,
+    client: MilvusClient,
+    options: MilvusDenseSearchOptions,
   ) {
+    this.client = client;
+    this.options = options;
     this.vectorField = options.vectorField ?? 'embedding';
     this.searchEf = options.searchEf ?? 64;
+    this.idField = options.idField ?? 'id';
+    this.contentField = options.contentField ?? 'content';
+    this.sourceIdField = options.sourceIdField ?? 'source_id';
+    this.runIdField = options.runIdField ?? 'run_id';
+    this.documentIdField = options.documentIdField;
+    this.documentVersionField = options.documentVersionField;
   }
 
   async search(query: DenseSearchQuery): Promise<DenseSearchResult[]> {
@@ -88,9 +123,20 @@ export class MilvusDenseSearchAdapter {
       throw new Error('Dense search limit must be a positive integer');
     }
 
-    const filter = query.runId === undefined
-      ? undefined
-      : `run_id == "${escapeMilvusString(query.runId)}"`;
+    const filters: string[] = [];
+    if (query.runId !== undefined) {
+      filters.push(`${this.runIdField} == "${escapeMilvusString(query.runId)}"`);
+    }
+    if (query.filter?.trim()) filters.push(`(${query.filter.trim()})`);
+    const filter = filters.length > 0 ? filters.join(' && ') : undefined;
+    const outputFields = [
+      this.idField,
+      this.runIdField,
+      this.sourceIdField,
+      this.contentField,
+      ...(this.documentIdField ? [this.documentIdField] : []),
+      ...(this.documentVersionField ? [this.documentVersionField] : []),
+    ].filter((field, index, fields) => fields.indexOf(field) === index);
     const response = await this.client.search({
       collection_name: this.options.collection,
       data: [query.vector],
@@ -99,7 +145,7 @@ export class MilvusDenseSearchAdapter {
       metric_type: MetricType.COSINE,
       params: { ef: this.searchEf },
       ...(filter ? { filter } : {}),
-      output_fields: ['id', 'run_id', 'source_id', 'content'],
+      output_fields: outputFields,
       consistency_level: ConsistencyLevelEnum.Strong,
     }) as SearchResponse;
 
@@ -109,11 +155,17 @@ export class MilvusDenseSearchAdapter {
     }
 
     return (response.results ?? []).map((result) => ({
-      id: asString(result.id, 'id'),
-      content: asString(result.content, 'content'),
-      sourceId: asString(result.source_id, 'source_id'),
+      id: asString(result[this.idField], this.idField),
+      content: asString(result[this.contentField], this.contentField),
+      sourceId: asString(result[this.sourceIdField], this.sourceIdField),
       score: asScore(result.score),
-      runId: asString(result.run_id, 'run_id'),
+      runId: asString(result[this.runIdField], this.runIdField),
+      ...(this.documentIdField
+        ? { documentId: asOptionalString(result[this.documentIdField], this.documentIdField) }
+        : {}),
+      ...(this.documentVersionField
+        ? { documentVersion: asOptionalString(result[this.documentVersionField], this.documentVersionField) }
+        : {}),
     }));
   }
 }

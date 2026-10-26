@@ -1,8 +1,11 @@
 import { createHash } from 'node:crypto';
+import { parseDocument } from '../src/application/rag/document-parser.ts';
 import { ingestDocument } from '../src/application/rag/ingest-document.ts';
 import { InMemoryDocumentVersionStore } from '../src/application/rag/document-version-service.ts';
 import type { RagChunkRepository } from '../src/adapters/rag/milvus-rag-repository.ts';
 import type { IndexVersionKey, RAGChunkRow } from '../src/extensions/huahuo/rag/types.ts';
+
+const startedAt = Date.now();
 
 class MockEmbeddingClient {
   async embed(texts: string[]): Promise<number[][]> {
@@ -39,6 +42,10 @@ class InMemoryChunkRepository implements RagChunkRepository {
 }
 
 async function main(): Promise<void> {
+  const parsed = await parseDocument({
+    content: '# Hello\n\nThis is a deterministic mock ingestion document.',
+    fileName: 'mock.md',
+  });
   const result = await ingestDocument(
     {
       sourceId: 'mock-source-1',
@@ -46,10 +53,11 @@ async function main(): Promise<void> {
       documentId: 'mock-document-1',
       documentVersion: 'v1',
       title: 'Mock RAG document',
-      content: '# Hello\n\nThis is a deterministic mock ingestion document.',
+      content: parsed.content,
       tenantId: 'mock-tenant',
       ownerId: 'mock-owner',
       knowledgeBaseId: 'mock-kb',
+      metadata: { parserVersion: parsed.parserVersion, format: parsed.format },
     },
     {
       pipelineVersion: 'mock-v1',
@@ -68,6 +76,9 @@ async function main(): Promise<void> {
   console.log(JSON.stringify({
     ok: true,
     mode: 'mock',
+    successCount: 1,
+    failureCount: 0,
+    durationMs: Date.now() - startedAt,
     status: result.status,
     documentId: result.documentId,
     documentVersion: result.documentVersion,
@@ -75,12 +86,16 @@ async function main(): Promise<void> {
     chunkCount: result.chunkCount,
     embeddingModel: result.embeddingModel,
     embeddingDimensions: result.embeddingDimensions,
+    parserVersion: parsed.parserVersion,
   }));
 }
 
 main().catch((error: unknown) => {
   console.error(JSON.stringify({
     ok: false,
+    successCount: 0,
+    failureCount: 1,
+    durationMs: Date.now() - startedAt,
     message: error instanceof Error ? error.message : 'Mock ingest failed',
   }));
   process.exitCode = 1;

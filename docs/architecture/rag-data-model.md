@@ -3,7 +3,7 @@
 ## 设计原则
 
 1. `huahuo-server` 是原始文章、文件和知识库归属的权威来源。
-2. Milvus 只保存派生切片、Embedding、BM25 Function 输出和来源/版本关联。
+2. PostgreSQL 保存可追溯的规范化切片正文和索引元数据；Milvus 保存 Embedding、BM25 Function 输入/输出和来源/版本关联。
 3. 稳定身份、版本和幂等状态不能由 `contentHash` 单独决定。
 4. 新版本索引完成后再切换可见版本。
 5. 同一物理内容可以被多个知识库授权引用，但只生成一份向量。
@@ -43,6 +43,19 @@ rag_documents
 
 如果不希望在 Agent 引入关系数据库，可以将这些状态放在 huahuo-server 的索引状态 API 或事件投影中；Milvus 行本身不能承担完整的状态机职责。
 
+### 正文存储边界
+
+原始上传文件和业务全文仍由 `huahuo-server` 或对象存储保管。Agent 的
+`rag_chunk_contents` 表保存一次索引版本产生的规范化 chunk 文本、标题路径、
+字符偏移、token 估算、租户和授权投影，作为检索结果引用和重新索引的权威来源；
+它不保存 embedding。该表由 `migrations/0004_rag_content.sql` 创建，
+`PostgresRagChunkStore` 以 `(idempotency_key, chunk_id)` 幂等写入。
+
+当前 Milvus Collection 仍保留一个受长度限制的 `text` 字段，用于 BM25 和减少
+简单召回的往返；它是可重建的反规范化副本，不能作为正文、权限或版本状态的唯一来源。
+如果未来把文本从 Milvus schema 移除，检索流程应使用返回的 `chunk_id` 批量查询
+`rag_chunk_contents`，再组装引用片段。
+
 ## Milvus Collection：`huahuo_chunks`
 
 以下字段是逻辑模型，实际类型和长度要根据目标 Milvus 服务版本确认：
@@ -61,12 +74,16 @@ rag_documents
 | `content_hash` | VarChar | 规范化内容哈希 |
 | `chunk_hash` | VarChar | 当前切片文本哈希 |
 | `chunk_index` | Int32 | 文档内顺序 |
-| `heading_path` | Array/JSON | Markdown 标题路径 |
+| `heading_path` | VarChar（紧凑 JSON 字符串） | Markdown 标题路径；SDK 2.6.17 创建校验暂不接受 JSON 字段 |
 | `language` | VarChar | analyzer 选择和调试 |
 | `text` | VarChar | BM25 Function 的输入文本和结果展示 |
 | `dense` | FloatVector | Embedding 向量 |
 | `embedding_profile` | VarChar | 模型、版本和维度的稳定配置 ID |
 | `created_at` | Int64/VarChar | 运行和清理追踪 |
+
+当前实现将可选 `metadata` 也编码为 VarChar 中的紧凑 JSON 字符串，避免使用
+`@zilliz/milvus2-sdk-node@2.6.17` 的不兼容 JSON Collection 创建路径。升级 SDK 或
+服务版本后，必须重新核验 Schema 和读写格式，不能原地改变现有 Collection。
 
 BM25 建议使用 `text` 字段加 Milvus BM25 Function 生成 Sparse 输出字段，例如 `text_sparse`。Dense 字段和 Sparse 字段分别建立相应索引，再通过 Hybrid Search + RRF 合并。
 

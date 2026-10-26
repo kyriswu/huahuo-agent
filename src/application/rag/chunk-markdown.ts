@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { MarkdownChunk } from '../../extensions/huahuo/rag/types.ts';
+import type { MarkdownChunk, SourceType } from '../../extensions/huahuo/rag/types.ts';
 
 export const CHUNKER_VERSION = 'markdown-heading-v1';
 export const TOKEN_COUNT_STRATEGY = 'heuristic-v1';
@@ -7,7 +7,11 @@ export const TOKEN_COUNT_STRATEGY = 'heuristic-v1';
 export interface ChunkMarkdownInput {
   documentId: string;
   documentVersion: string;
+  /** Source context is accepted here so callers can pass the complete document DTO. */
+  title?: string;
   content: string;
+  sourceType?: SourceType;
+  metadata?: Record<string, unknown>;
   maxTokens: number;
   overlapTokens: number;
   chunkerVersion?: string;
@@ -19,6 +23,19 @@ interface MarkdownBlock {
   endOffset: number;
   headingPath: string[];
   kind: 'paragraph' | 'code' | 'table' | 'heading';
+}
+
+interface ChunkPiece {
+  text: string;
+  startOffset: number;
+  endOffset: number;
+  headingPath: string[];
+}
+
+interface CarryText {
+  text: string;
+  startOffset: number;
+  endOffset: number;
 }
 
 export function normalizeMarkdown(content: string): string {
@@ -52,9 +69,9 @@ function headingMatch(line: string): { level: number; title: string } | undefine
 }
 
 function updateHeadingPath(path: string[], level: number, title: string): string[] {
-  const next = path.slice(0, level - 1);
-  next[level - 1] = title;
-  return next;
+  // Markdown permits heading levels to be skipped. Keep only concrete
+  // ancestors so the serialized path never contains sparse/undefined slots.
+  return [...path.slice(0, level - 1).filter(Boolean), title];
 }
 
 function createBlocks(content: string): MarkdownBlock[] {
@@ -186,9 +203,62 @@ function overlapText(text: string, overlapTokens: number): string {
   return joinTokenUnits(tokens.slice(Math.max(0, tokens.length - overlapTokens)), text);
 }
 
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function locateSourceText(
+  source: string,
+  text: string,
+  fromOffset: number,
+  endOffset: number,
+  preferLast = false,
+): number {
+  const exact = preferLast
+    ? source.lastIndexOf(text, Math.max(0, endOffset - text.length))
+    : source.indexOf(text, Math.max(0, fromOffset));
+  if (exact >= fromOffset && exact + text.length <= endOffset) return exact;
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return Math.max(0, fromOffset);
+  const pattern = words.map(escapeRegex).join('\\s+');
+  const matcher = new RegExp(pattern, 'g');
+  matcher.lastIndex = Math.max(0, fromOffset);
+  let match: RegExpExecArray | null;
+  let lastMatch = -1;
+  while ((match = matcher.exec(source))) {
+    if (match.index + match[0].length > endOffset) break;
+    lastMatch = match.index;
+  }
+  return lastMatch >= 0 ? lastMatch : Math.max(0, Math.min(fromOffset, endOffset));
+}
+
+function blockPieces(block: MarkdownBlock, maxTokens: number): ChunkPiece[] {
+  const pieces = splitAtSentenceOrWord(block.text, maxTokens)
+    .map((piece) => piece.trim())
+    .filter(Boolean);
+  let cursor = 0;
+  return pieces.map((text) => {
+    const localStart = locateSourceText(block.text, text, cursor, block.text.length);
+    const localEnd = Math.min(block.text.length, localStart + text.length);
+    cursor = localEnd;
+    return {
+      text,
+      startOffset: block.startOffset + localStart,
+      endOffset: Math.max(block.startOffset + localStart, block.startOffset + localEnd),
+      headingPath: [...block.headingPath],
+    };
+  });
+}
+
 export function chunkMarkdown(input: ChunkMarkdownInput): MarkdownChunk[] {
   if (!input.documentId.trim() || !input.documentVersion.trim()) {
     throw new Error('documentId and documentVersion are required');
+  }
+  if (input.title !== undefined && !input.title.trim()) {
+    throw new Error('title must not be empty when provided');
+  }
+  if (input.sourceType !== undefined && !['article', 'file', 'note'].includes(input.sourceType)) {
+    throw new Error('sourceType must be article, file, or note');
   }
   if (!Number.isInteger(input.maxTokens) || input.maxTokens <= 0) {
     throw new Error('maxTokens must be a positive integer');
@@ -203,6 +273,7 @@ export function chunkMarkdown(input: ChunkMarkdownInput): MarkdownChunk[] {
   const blocks = createBlocks(content);
   const chunks: MarkdownChunk[] = [];
   let pending: { text: string; startOffset: number; endOffset: number; headingPath: string[] } | undefined;
+  let carry: CarryText | undefined;
 
   const emit = (): void => {
     if (!pending?.text.trim()) return;
@@ -223,32 +294,46 @@ export function chunkMarkdown(input: ChunkMarkdownInput): MarkdownChunk[] {
       contentHash,
       chunkerVersion,
     });
+    const overlap = overlapText(text, input.overlapTokens);
+    if (overlap) {
+      const carryStart = locateSourceText(content, overlap, 0, pending.endOffset, true);
+      carry = {
+        text: overlap,
+        startOffset: carryStart,
+        endOffset: pending.endOffset,
+      };
+    } else {
+      carry = undefined;
+    }
     pending = undefined;
   };
 
   for (const block of blocks) {
-    const pieces = splitAtSentenceOrWord(block.text, input.maxTokens);
+    const pieces = blockPieces(block, input.maxTokens);
     for (const piece of pieces) {
-      const candidate = pending ? `${pending.text}\n${piece}` : piece;
+      const firstPiece = !pending && carry ? `${carry.text}\n${piece.text}` : piece.text;
+      const candidate = pending ? `${pending.text}\n${piece.text}` : firstPiece;
       if (pending && estimateTokenCount(candidate) > input.maxTokens) {
-        const previous = pending.text;
         emit();
-        const overlap = overlapText(previous, input.overlapTokens);
         pending = {
-          text: overlap ? `${overlap}\n${piece}` : piece,
-          startOffset: Math.max(0, block.startOffset - overlap.length),
-          endOffset: block.endOffset,
-          headingPath: [...block.headingPath],
+          text: carry ? `${carry.text}\n${piece.text}` : piece.text,
+          startOffset: carry?.startOffset ?? piece.startOffset,
+          endOffset: piece.endOffset,
+          headingPath: piece.headingPath,
         };
+        carry = undefined;
       } else {
         pending = {
           text: candidate,
-          startOffset: pending ? Math.min(pending.startOffset, block.startOffset) : block.startOffset,
-          endOffset: block.endOffset,
-          headingPath: pending && pending.headingPath.join('\u0000') === block.headingPath.join('\u0000')
+          startOffset: pending
+            ? Math.min(pending.startOffset, piece.startOffset)
+            : carry?.startOffset ?? piece.startOffset,
+          endOffset: piece.endOffset,
+          headingPath: pending && pending.headingPath.join('\u0000') === piece.headingPath.join('\u0000')
             ? pending.headingPath
-            : [...block.headingPath],
+            : piece.headingPath,
         };
+        carry = undefined;
       }
       if (pending && estimateTokenCount(pending.text) >= input.maxTokens) emit();
     }

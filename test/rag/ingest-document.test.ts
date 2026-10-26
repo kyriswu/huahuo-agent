@@ -16,14 +16,16 @@ class FakeEmbedding {
 class FakeRepository implements RagChunkRepository {
   rows = new Map<string, RAGChunkRow>();
   failNext = false;
+  failOnCall?: number;
   upsertCalls = 0;
 
   async ensureReady(): Promise<void> {}
 
   async upsertChunks(rows: RAGChunkRow[]): Promise<void> {
     this.upsertCalls += 1;
-    if (this.failNext) {
+    if (this.failNext || this.failOnCall === this.upsertCalls) {
       this.failNext = false;
+      this.failOnCall = undefined;
       throw new Error('temporary write failure');
     }
     for (const row of rows) this.rows.set(row.chunkId, { ...row });
@@ -138,6 +140,45 @@ describe('ingestDocument', () => {
     await ingestDocument(input, options, dependencies);
     await expect(ingestDocument({ ...input, content: 'different' }, options, dependencies))
       .rejects.toThrow('different content hash');
+  });
+
+  it('isolates a new pipeline version with a new idempotency key', async () => {
+    const embedding = new FakeEmbedding();
+    const repository = new FakeRepository();
+    const versionStore = new InMemoryDocumentVersionStore();
+    const first = await ingestDocument(input, options, { embedding, repository, versionStore });
+    const next = await ingestDocument(input, { ...options, pipelineVersion: 'v2' }, {
+      embedding,
+      repository,
+      versionStore,
+    });
+    expect(next.idempotencyKey).not.toBe(first.idempotencyKey);
+    expect(embedding.calls).toBe(2);
+    expect((await versionStore.findByDocumentVersion('doc-1', 'v1'))[0]?.status).toBe('superseded');
+  });
+
+  it('retries a partial batch without duplicating valid chunk IDs', async () => {
+    const repository = new FakeRepository();
+    const versionStore = new InMemoryDocumentVersionStore();
+    const embedding = new FakeEmbedding();
+    const longInput = {
+      ...input,
+      content: '# Heading\n\none two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen.',
+    };
+    repository.failOnCall = 2;
+    await expect(ingestDocument(longInput, { ...options, maxTokens: 4, overlapTokens: 1, batchSize: 1 }, {
+      embedding,
+      repository,
+      versionStore,
+    })).rejects.toThrow('temporary write failure');
+    const retried = await ingestDocument(longInput, { ...options, maxTokens: 4, overlapTokens: 1, batchSize: 1 }, {
+      embedding,
+      repository,
+      versionStore,
+    });
+    expect(retried.status).toBe('visible');
+    expect(repository.rows.size).toBe(retried.chunkCount);
+    expect(new Set(repository.rows.keys()).size).toBe(repository.rows.size);
   });
 });
 
