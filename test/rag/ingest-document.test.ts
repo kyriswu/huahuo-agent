@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ingestDocument } from '../../src/application/rag/ingest-document.ts';
 import { InMemoryDocumentVersionStore } from '../../src/application/rag/document-version-service.ts';
-import type { RagChunkRepository } from '../../src/adapters/rag/milvus-rag-repository.ts';
-import type { IndexVersionKey, RAGChunkRow } from '../../src/extensions/huahuo/rag/types.ts';
+import type { IndexVersionKey, RAGChunkRow, RagChunkRepositoryPort } from '../../src/extensions/huahuo/rag/types.ts';
 
 class FakeEmbedding {
   calls = 0;
@@ -13,7 +12,7 @@ class FakeEmbedding {
   }
 }
 
-class FakeRepository implements RagChunkRepository {
+class FakeRepository implements RagChunkRepositoryPort {
   rows = new Map<string, RAGChunkRow>();
   failNext = false;
   failOnCall?: number;

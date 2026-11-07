@@ -1,0 +1,25 @@
+services:
+  agent:
+    image: huahuo-agent:${HUAHUO_AGENT_TAG:-local}
+    build:
+      context: .
+      args:
+        MASTRA_BUILD_STUDIO: ${MASTRA_BUILD_STUDIO:-true}
+    env_file:
+      - path: .env
+        format: raw
+    environment:
+      NODE_ENV: production
+      APP_ENV: ${APP_ENV:-production}
+      MASTRA_HOST: 0.0.0.0
+      PORT: "4111"
+    ports:
+      - "${AGENT_BIND_ADDRESS:-127.0.0.1}:${AGENT_PORT:-4111}:4111"
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 60s
+
+networks:
+  default:
+    name: ${HUAHUO_AGENT_NETWORK:-huahuo-agent_default}
+    external: ${HUAHUO_AGENT_NETWORK_EXTERNAL:-false}

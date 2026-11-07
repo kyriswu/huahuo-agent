@@ -2,8 +2,7 @@ import { createHash } from 'node:crypto';
 import { parseDocument } from '../src/application/rag/document-parser.ts';
 import { ingestDocument } from '../src/application/rag/ingest-document.ts';
 import { InMemoryDocumentVersionStore } from '../src/application/rag/document-version-service.ts';
-import type { RagChunkRepository } from '../src/adapters/rag/milvus-rag-repository.ts';
-import type { IndexVersionKey, RAGChunkRow } from '../src/extensions/huahuo/rag/types.ts';
+import type { IndexVersionKey, RAGChunkRow, RagChunkRepositoryPort } from '../src/extensions/huahuo/rag/types.ts';
 
 const startedAt = Date.now();
 
@@ -16,7 +15,7 @@ class MockEmbeddingClient {
   }
 }
 
-class InMemoryChunkRepository implements RagChunkRepository {
+class InMemoryChunkRepository implements RagChunkRepositoryPort {
   private readonly rows = new Map<string, RAGChunkRow>();
 
   async ensureReady(): Promise<void> {}

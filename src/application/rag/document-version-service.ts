@@ -59,7 +59,7 @@ export function makeIdempotencyKey(key: IndexVersionKey): string {
  * Process-local state store for tests and the mock flow.
  *
  * A production deployment must replace this with a durable index-state API or
- * database. Milvus rows alone cannot provide cross-process state recovery.
+ * database. Vector-index rows alone cannot provide cross-process state recovery.
  */
 export class InMemoryDocumentVersionStore implements DocumentVersionStore {
   private readonly records = new Map<string, IndexVersionRecord>();

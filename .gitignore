@@ -5,4 +5,5 @@ dist/
 .env.*
 !.env.example
 *.log
+*.DS_Store
 artifacts/rag-acceptance/

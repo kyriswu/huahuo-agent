@@ -1,0 +1,12 @@
+# Only application sources and locked build inputs enter the build context.
+*
+!package.json
+!pnpm-lock.yaml
+!.npmrc
+!tsconfig.json
+!src/
+!src/**
+
+**/.env
+**/.env.*
+**/.DS_Store

@@ -1,26 +1,6 @@
 import type { SearchMode } from '../../../contracts/rag-search.ts';
 import { RagConfigurationError } from './errors.ts';
 
-export interface HuahuoRagConfig {
-  milvus: {
-    endpoint: string;
-    token?: string;
-    collection: string;
-  };
-  embedding: RagEmbeddingConfig;
-  chunking: RagChunkingConfig;
-  ingest: RagIngestConfig;
-  ragCollection: string;
-  stateDatabaseUrl?: string;
-  searchMode: SearchMode;
-  rerank: {
-    enabled: boolean;
-    baseUrl?: string;
-    apiKey?: string;
-    model?: string;
-  };
-}
-
 export interface RagEmbeddingConfig {
   baseUrl?: string;
   apiKey?: string;
@@ -49,10 +29,14 @@ export interface RagRuntimeConfig {
   embedding: RagEmbeddingConfig;
   chunking: RagChunkingConfig;
   ingest: RagIngestConfig;
-  ragCollection: string;
   stateDatabaseUrl?: string;
   searchMode: SearchMode;
-  rerank: HuahuoRagConfig['rerank'];
+  rerank: {
+    enabled: boolean;
+    baseUrl?: string;
+    apiKey?: string;
+    model?: string;
+  };
 }
 
 function positiveInteger(
@@ -138,7 +122,6 @@ export function loadRagConfig(env: NodeJS.ProcessEnv = process.env): RagRuntimeC
       batchSize: positiveInteger(env, 'RAG_INGEST_BATCH_SIZE', 32),
       pipelineVersion: env.RAG_INDEX_PIPELINE_VERSION?.trim() || 'v1',
     },
-    ragCollection: env.RAG_MILVUS_COLLECTION?.trim() || 'huahuo_chunks',
     ...(env.RAG_STATE_DATABASE_URL ? { stateDatabaseUrl: env.RAG_STATE_DATABASE_URL.trim() } : {}),
     searchMode,
     rerank: {
@@ -147,23 +130,6 @@ export function loadRagConfig(env: NodeJS.ProcessEnv = process.env): RagRuntimeC
       ...(env.RAG_RERANK_API_KEY ? { apiKey: env.RAG_RERANK_API_KEY } : {}),
       ...(env.RAG_RERANK_MODEL ? { model: env.RAG_RERANK_MODEL } : {}),
     },
-  };
-}
-
-/** Legacy search configuration with the pre-existing MILVUS_ENDPOINT contract. */
-export function loadHuahuoRagConfig(env: NodeJS.ProcessEnv = process.env): HuahuoRagConfig {
-  const endpoint = env.MILVUS_ENDPOINT?.trim();
-  if (!endpoint) {
-    throw new RagConfigurationError('Missing required environment variable: MILVUS_ENDPOINT');
-  }
-  const runtime = loadRagConfig(env);
-  return {
-    milvus: {
-      endpoint,
-      collection: env.MILVUS_COLLECTION?.trim() || 'huahuo_documents',
-      ...(env.MILVUS_TOKEN ? { token: env.MILVUS_TOKEN } : {}),
-    },
-    ...runtime,
   };
 }
 

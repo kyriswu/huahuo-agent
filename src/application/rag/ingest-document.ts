@@ -215,13 +215,13 @@ export async function ingestDocument(
 
     // Keep the canonical chunk text in the durable content store.  It is
     // written in the building state first, then promoted together with the
-    // vector rows after Milvus verification.  This makes retries idempotent
-    // and prevents an incomplete index from becoming visible to retrieval.
+    // vector rows after index verification. This makes retries idempotent and
+    // prevents an incomplete index from becoming visible to retrieval.
     await dependencies.contentStore?.upsertChunks(rows);
     await upsertBatches(rows, dependencies.repository, options.batchSize);
     const buildingCount = await dependencies.repository.countVersionChunks(key, 'building');
     if (buildingCount !== rows.length) {
-      throw new IngestError(`Milvus verification found ${buildingCount} building chunks, expected ${rows.length}`);
+      throw new IngestError(`Vector index verification found ${buildingCount} building chunks, expected ${rows.length}`);
     }
 
     const readyRows = rows.map((row) => ({ ...row, documentVersionState: 'ready' as const }));
@@ -229,7 +229,7 @@ export async function ingestDocument(
     await dependencies.contentStore?.upsertChunks(readyRows);
     const readyCount = await dependencies.repository.countVersionChunks(key, 'ready');
     if (readyCount !== rows.length) {
-      throw new IngestError(`Milvus verification found ${readyCount} ready chunks, expected ${rows.length}`);
+      throw new IngestError(`Vector index verification found ${readyCount} ready chunks, expected ${rows.length}`);
     }
 
     const ready = await dependencies.versionStore.markStatus(idempotencyKey, 'ready', {

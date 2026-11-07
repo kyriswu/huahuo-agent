@@ -41,7 +41,7 @@ async function main(): Promise<number> {
       }));
       return 0;
     }
-    // Source content and an authorized Milvus repository are intentionally not inferred here.
+    // Source content and an authorized vector-index repository are intentionally not inferred here.
     // Claiming a job without both would make recovery unsafe, so leave jobs untouched.
     console.log(JSON.stringify({
       ok: false,
@@ -51,7 +51,7 @@ async function main(): Promise<number> {
       recoverableCount: jobs.length,
       jobIds: jobs.map((job) => job.jobId),
       workerId: `recovery-${randomUUID()}`,
-      message: 'Recoverable jobs found, but no authorized source-content and Milvus recovery coordinator is configured; no state was modified',
+      message: 'Recoverable jobs found, but no authorized source-content and vector-index recovery coordinator is configured; no state was modified',
       durationMs: Date.now() - startedAt,
     }));
     return 2;

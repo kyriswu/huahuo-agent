@@ -78,8 +78,8 @@ async function main(): Promise<number> {
       checkedVersions: versions.length,
       checkedHeads: heads.length,
       stateConflicts: [],
-      milvusVerification: 'NOT_RUN',
-      message: 'PostgreSQL state is internally consistent for the inspected rows; Milvus cross-store comparison was not run',
+      vectorIndexVerification: 'NOT_RUN',
+      message: 'PostgreSQL state is internally consistent for the inspected rows; external vector-index comparison was not run',
       durationMs: Date.now() - startedAt,
     }));
     return 2;

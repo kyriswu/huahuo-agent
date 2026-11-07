@@ -21,7 +21,7 @@ export interface SearchKnowledgeDependencies {
 
 /**
  * Search orchestration deliberately has no provider-specific assumptions. This
- * keeps Milvus today and future search/rerank adapters interchangeable.
+ * keeps vector-search and rerank adapters interchangeable.
  */
 export async function searchKnowledge(
   input: SearchKnowledgeInput,

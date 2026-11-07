@@ -120,11 +120,7 @@ export interface RagChunkRepositoryPort {
   countVersionChunks(key: IndexVersionKey, state: RAGChunkRow['documentVersionState']): Promise<number>;
 }
 
-/**
- * Canonical chunk content is kept outside the vector index.  Implementations
- * may use PostgreSQL or an object store; the Milvus adapter remains concerned
- * with vectors and retrieval metadata only.
- */
+/** Canonical chunk content is kept outside the vector index. */
 export interface RagChunkContentRecord extends MarkdownChunk {
   idempotencyKey: string;
   runId?: string;

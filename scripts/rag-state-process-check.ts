@@ -81,7 +81,7 @@ async function writeState(runId: string): Promise<Record<string, unknown>> {
       versionStatus: version.status,
       jobId: job.jobId,
       jobStatus: job.status,
-      note: 'State is intentionally left processing/pending; no Milvus write is claimed by this PostgreSQL-only check',
+      note: 'State is intentionally left processing/pending; no vector-index write is claimed by this PostgreSQL-only check',
     };
   });
 }
@@ -179,7 +179,7 @@ async function verifyVersion(runId: string): Promise<Record<string, unknown>> {
       runId,
       activeVersionBeforeVerification,
       unverifiedPromotionRejected: rejected,
-      note: 'This verifies PostgreSQL refuses activation before Milvus verification; successful cross-store switching still requires the full ingest coordinator.',
+      note: 'This verifies PostgreSQL refuses activation before vector-index verification; successful cross-store switching still requires the full ingest coordinator.',
     };
   });
 }
@@ -225,7 +225,7 @@ async function scenarioAll(runId: string): Promise<Record<string, unknown>> {
     runId,
     independentProcesses: true,
     checks: { write, read, verifyIdempotency: idem, verifyVersion: version },
-    note: 'This is a PostgreSQL persistence/state-machine check. It does not claim Milvus cross-store recovery.',
+    note: 'This is a PostgreSQL persistence/state-machine check. It does not claim external vector-index recovery.',
   };
 }
 

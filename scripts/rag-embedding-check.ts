@@ -58,7 +58,7 @@ async function main(): Promise<number> {
   const samples = [
     '项目复盘会议安排在周五下午三点。',
     'A healthy apple tree needs sunlight and well-drained soil.',
-    'Milvus uses HNSW with COSINE similarity for dense vector retrieval.',
+    'The future vector backend will use the configured embedding dimensions for dense retrieval.',
   ];
 
   try {

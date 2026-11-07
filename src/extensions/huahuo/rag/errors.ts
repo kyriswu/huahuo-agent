@@ -18,8 +18,6 @@ export type RagErrorCode =
   | 'DOCUMENT_EMPTY'
   | 'DOCUMENT_VERSION_CONFLICT'
   | 'INDEX_VERSION_NOT_READY'
-  | 'MILVUS_UNAVAILABLE'
-  | 'MILVUS_SCHEMA_INCOMPATIBLE'
   | 'INGEST_FAILED';
 
 export class RagError extends Error {

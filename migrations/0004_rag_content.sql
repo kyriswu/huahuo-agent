@@ -1,5 +1,5 @@
--- Canonical RAG chunk content.  Milvus stores the derived vector and small
--- retrieval fields; this table is the source of truth for text and citations.
+-- Canonical RAG chunk content. The selected vector adapter stores derived
+-- vectors separately; this table is the source of truth for text and citations.
 -- Apply only to the explicitly authorized RAG state database.
 
 CREATE TABLE IF NOT EXISTS rag_chunk_contents (
