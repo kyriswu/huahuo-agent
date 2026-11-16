@@ -3,6 +3,7 @@ import { MastraEditor } from '@mastra/editor';
 import { RequestContext } from '@mastra/core/request-context';
 import { InMemoryStore } from '@mastra/core/storage';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { applyTrustedIdentity, readTrustedIdentity } from '../src/auth/trusted-identity.js';
 
 type ChatMessage = {
   role: string;
@@ -61,7 +62,6 @@ describe('Mastra runtime compatibility', () => {
     vi.stubEnv('CLIPROXY_API_KEY', 'local-model-key');
     vi.stubEnv('CLIPROXY_MODEL', 'local-runtime-model');
     vi.stubEnv('HUAHUO_SERVER_BASE_URL', serverBaseUrl);
-    vi.stubEnv('HUAHUO_AGENT_TO_SERVER_API_KEY', 'local-service-key');
     vi.stubEnv('MASTRA_MEMORY_GENERATE_TITLE', 'false');
 
     const modelRequests: Array<{ headers: Headers; body: ChatRequest }> = [];
@@ -107,8 +107,13 @@ describe('Mastra runtime compatibility', () => {
 
     try {
       const requestContext = new RequestContext();
-      requestContext.set('huahuoUserJwt', 'local-user.jwt');
-      const memory = { thread: 'upgrade-thread', resource: 'upgrade-user' };
+      const userId = 'a0000000-0000-4000-8000-000000000001';
+      const sessionId = 'b0000000-0000-4000-8000-000000000002';
+      applyTrustedIdentity(requestContext, readTrustedIdentity({
+        'x-huahuo-user-id': userId, 'x-huahuo-session-id': sessionId,
+        'x-huahuo-auth-method': 'bearer', 'x-trace-id': 'runtime-regression',
+      }));
+      const memory = { thread: 'upgrade-thread', resource: userId };
       const firstPrompt = 'Find the evidence for the Mastra upgrade.';
       const result = await huoxAgent.generate(firstPrompt, {
         requestContext,
@@ -124,9 +129,10 @@ describe('Mastra runtime compatibility', () => {
       expect(modelRequests[0].body.tools?.some(tool => tool.function.name === 'huahuoRagQueryTool')).toBe(true);
       expect(JSON.stringify(modelRequests[1].body.messages)).toContain('upgrade-doc');
       expect(ragRequests).toHaveLength(1);
-      expect(ragRequests[0].headers.get('authorization')).toBe('Bearer local-user.jwt');
-      expect(ragRequests[0].headers.get('x-huahuo-service-key')).toBe('local-service-key');
-      expect(ragRequests[0].headers.get('x-huahuo-user-id')).toBeNull();
+      expect(ragRequests[0].headers.get('authorization')).toBeNull();
+      expect(ragRequests[0].headers.get('x-huahuo-service-key')).toBeNull();
+      expect(ragRequests[0].headers.get('x-huahuo-user-id')).toBe(userId);
+      expect(ragRequests[0].headers.get('x-huahuo-session-id')).toBe(sessionId);
       expect(ragRequests[0].body).toEqual({ query: 'Mastra upgrade', mode: 'hybrid', topK: 10 });
       expect(ragRequests[0].signal.aborted).toBe(false);
 

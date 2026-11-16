@@ -12,12 +12,12 @@ function document(title: string, body: string, nonce: string, script = ''): stri
   return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)} · 花火</title><style nonce="${nonce}">${styles}</style></head><body>${body}${script ? `<script nonce="${nonce}">${script}</script>` : ''}</body></html>`;
 }
 
-export function loginPage(nonce: string): string {
+export function loginPage(nonce: string, publicPath = '/agent'): string {
   return document('登录', `<header><span>花火</span><button id="logout" class="link" type="button" hidden>退出登录</button></header>
 <main><h1>登录</h1><form id="login" novalidate>
 <label class="field" for="phone">手机号</label><input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="请输入手机号" maxlength="16" required>
 <label class="field" for="code">验证码</label><div class="code-row"><input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" placeholder="请输入验证码" maxlength="6" required><button id="send" type="button" disabled>获取验证码</button></div>
-<label class="consent"><input id="consent" type="checkbox"><span>我已阅读并同意<a href="/studio-auth/legal/agreement" target="_blank" rel="noopener">《用户协议》</a>和<a href="/studio-auth/legal/privacy" target="_blank" rel="noopener">《隐私政策》</a></span></label>
+<label class="consent"><input id="consent" type="checkbox"><span>我已阅读并同意<a href="${publicPath}/studio-auth/legal/agreement" target="_blank" rel="noopener">《用户协议》</a>和<a href="${publicPath}/studio-auth/legal/privacy" target="_blank" rel="noopener">《隐私政策》</a></span></label>
 <button class="primary" id="submit" type="submit" disabled>登录</button><p id="error" role="alert" aria-live="polite"></p>
 </form><noscript>请启用 JavaScript 后登录。</noscript></main>`, nonce, `
 const phone=document.querySelector('#phone'),code=document.querySelector('#code'),consent=document.querySelector('#consent'),send=document.querySelector('#send'),submit=document.querySelector('#submit'),error=document.querySelector('#error'),logout=document.querySelector('#logout');
@@ -27,15 +27,15 @@ let smsId='',sentPhone='',seconds=0,sending=false,logging=false,sendKey=uuid(),l
 const validPhone=()=>/^(?:\\+86)?1[3-9]\\d{9}$/.test(phone.value.trim());
 function update(){send.disabled=!validPhone()||seconds>0||sending||logging;send.textContent=sending?'发送中…':seconds>0?seconds+' 秒后重发':'获取验证码';submit.disabled=!smsId||sentPhone!==phone.value.trim()||!/^\\d{6}$/.test(code.value)||!consent.checked||logging;submit.textContent=logging?'登录中…':'登录';}
 function showFailure(data,status){const k=data?.error?.code||'';error.textContent=status===429?'操作频繁，请稍后重试。':k==='AGREEMENT_REQUIRED'?'请阅读并同意协议后重试。':/SMS.*(?:EXPIRED|INVALID|NOT_FOUND)|OTP|CODE_INVALID/.test(k)?'验证码有误或已过期，请重新获取。':status>=500?'暂时无法连接，请稍后重试。':'登录失败，请检查手机号和验证码后重试。';}
-async function post(path,body){const r=await fetch('/studio-auth/'+path,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const data=await r.json();if(!r.ok){showFailure(data,r.status);return null;}return data;}
+async function post(path,body){const r=await fetch('${publicPath}/studio-auth/'+path,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const data=await r.json();if(!r.ok){showFailure(data,r.status);return null;}return data;}
 phone.addEventListener('input',()=>{smsId='';code.value='';sendKey=uuid();loginKey=uuid();error.textContent='';update();});code.addEventListener('input',()=>{code.value=code.value.replace(/\\D/g,'');loginKey=uuid();error.textContent='';update();});consent.addEventListener('change',update);
 send.addEventListener('click',async()=>{sending=true;error.textContent='';update();const current=phone.value.trim();try{const data=await post('sms-code',{phone:current,requestId:sendKey});if(data){seconds=data.cooldownSeconds;sendKey=uuid();if(current===phone.value.trim()){smsId=data.smsRequestId;sentPhone=current;loginKey=uuid();code.focus();}}}catch{error.textContent='网络连接失败，请重试。';}finally{sending=false;update();}});
-document.querySelector('#login').addEventListener('submit',async e=>{e.preventDefault();if(submit.disabled)return;logging=true;error.textContent='';update();try{const data=await post('login',{phone:phone.value.trim(),smsRequestId:smsId,smsCode:code.value,clientId,agreementAccepted:consent.checked,timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone,requestId:loginKey});if(data)location.replace('/');}catch{error.textContent='网络连接失败，请重试。';}finally{logging=false;update();}});
+document.querySelector('#login').addEventListener('submit',async e=>{e.preventDefault();if(submit.disabled)return;logging=true;error.textContent='';update();try{const data=await post('login',{phone:phone.value.trim(),smsRequestId:smsId,smsCode:code.value,clientId,agreementAccepted:consent.checked,timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone,requestId:loginKey});if(data)location.replace('${publicPath}/');}catch{error.textContent='网络连接失败，请重试。';}finally{logging=false;update();}});
 logout.addEventListener('click',async()=>{logout.disabled=true;try{if(await post('logout',{}))location.reload();}catch{error.textContent='网络连接失败，请重试。';}finally{logout.disabled=false;}});
-fetch('/studio-auth/session',{credentials:'same-origin'}).then(r=>{logout.hidden=!r.ok;}).catch(()=>{});setInterval(()=>{if(seconds>0){seconds--;update();}},1000);update();
+fetch('${publicPath}/studio-auth/session',{credentials:'same-origin'}).then(r=>{logout.hidden=!r.ok;}).catch(()=>{});setInterval(()=>{if(seconds>0){seconds--;update();}},1000);update();
 `);
 }
 
-export function legalPage(nonce: string, title: string, text: string): string {
+export function legalPage(nonce: string, title: string, text: string, publicPath = '/agent'): string {
   return document(title, `<header><span>花火</span></header><main class="legal"><h1>${escapeHtml(title)}</h1><pre>${escapeHtml(text)}</pre></main>`, nonce);
 }

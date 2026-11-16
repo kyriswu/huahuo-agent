@@ -8,6 +8,7 @@ export class StudioLoginError extends Error {
 const tokenSchema = z.object({
   accessToken: z.string().min(1),
   refreshToken: z.string().min(1),
+  accessTokenExpiresAt: z.string().datetime(),
 });
 const userSchema = z.object({ userId: z.string().uuid(), displayName: z.string(), phoneMasked: z.string() });
 const loginSchema = tokenSchema.extend({ user: userSchema });
@@ -26,27 +27,18 @@ export class StudioIdentityClient {
     return this.parse(loginSchema, await this.request('/api/v1/auth/login', input, requestId));
   }
 
-  async refresh(refreshToken: string): Promise<StudioTokens> {
-    return this.parse(tokenSchema, await this.request('/api/v1/auth/refresh', { refreshToken }));
-  }
-
-  async logout(accessToken: string): Promise<void> {
-    await this.request('/api/v1/auth/logout', undefined, undefined, accessToken);
-  }
-
   private parse<T>(schema: z.ZodType<T>, data: unknown): T {
     const result = schema.safeParse(data);
     if (!result.success) throw new StudioLoginError('SERVER_RESPONSE_INVALID', 502);
     return result.data;
   }
 
-  private async request(path: string, body?: unknown, requestId?: string, accessToken?: string): Promise<unknown> {
+  private async request(path: string, body?: unknown, requestId?: string): Promise<unknown> {
     const headers: Record<string, string> = { 'content-type': 'application/json' };
     if (requestId) headers['x-idempotency-key'] = requestId;
-    if (accessToken) headers.authorization = `Bearer ${accessToken}`;
     let response: Response;
     try {
-      // No automatic retry: sending SMS and rotating refresh tokens are stateful operations.
+      // No automatic retry: sending SMS and issuing login tokens are stateful operations.
       response = await fetch(`${this.baseUrl}${path}`, {
         method: 'POST', headers, ...(body === undefined ? {} : { body: JSON.stringify(body) }),
         signal: AbortSignal.timeout(20_000), redirect: 'error',
