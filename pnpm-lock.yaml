@@ -36,6 +36,9 @@ importers:
       '@darabonba/typescript':
         specifier: 1.0.6
         version: 1.0.6
+      '@mastra/server':
+        specifier: 1.83.0
+        version: 1.83.0(@mastra/core@1.83.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))(zod@3.25.76)
       '@types/node':
         specifier: ^26.6.6
         version: 26.6.6

@@ -37,6 +37,7 @@
   "devDependencies": {
     "@alicloud/openapi-core": "1.0.9",
     "@darabonba/typescript": "1.0.6",
+    "@mastra/server": "1.83.0",
     "@types/node": "^26.6.6",
     "@types/pg": "^8.15.5",
     "mastra": "1.39.0",
