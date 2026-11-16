@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "id": "20261116-agent-ingress-ready",
-  "baseRevision": "17bf961e709c69dcb9d6ee52904e8c406abb07d4",
+  "id": "20261117-studio-gateway-session",
+  "baseRevision": "448cdb7c49945a445a9243137e190eb328ca45db",
   "services": [
     "agent"
   ],

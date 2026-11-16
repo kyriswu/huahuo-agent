@@ -26,7 +26,7 @@ const identityHeaders = (user = alice) => ({ 'x-huahuo-user-id': user, 'x-huahuo
 const json = (body: unknown, headers = {}) => ({ method: 'POST', headers: { 'content-type': 'application/json', origin, ...headers }, body: JSON.stringify(body) });
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 
-async function fixture() {
+async function fixture(enabled = true) {
   const requests: Array<{ path: string; body: Record<string, unknown>; headers: Headers }> = [];
   vi.stubEnv('HUAHUO_SERVER_BASE_URL', 'http://business.test');
   vi.stubGlobal('fetch', vi.fn(async (url: string, init: RequestInit) => {
@@ -42,12 +42,13 @@ async function fixture() {
     if (path === '/internal/v1/rag/query') return Response.json({ owner: headers.get('x-huahuo-user-id') });
     throw new Error('Unexpected isolated destination');
   }));
-  const gateway = createStudioGateway(config, new StudioIdentityClient('http://business.test'));
+  const gateway = createStudioGateway({ ...config, enabled }, new StudioIdentityClient('http://business.test'));
   const app = new Hono();
   app.use('*', async (c, next) => { c.set('requestContext', new RequestContext()); await next(); });
   app.use('*', gateway.middleware);
   for (const route of gateway.routes) if ('handler' in route && route.handler) app.on(route.method, route.path, route.handler as Handler);
   app.on('GET', '/agent/', c => c.html('<html><title>Studio fixture</title></html>'));
+  app.on('GET', '/api/auth/capabilities', c => c.json({ enabled: true, login: null }));
   app.on('GET', '/api/context', c => {
     const context = (c as ContextWithMastra).get('requestContext');
     return c.json({ resourceId: context.get(MASTRA_RESOURCE_ID_KEY) });
@@ -63,6 +64,25 @@ async function fixture() {
 const loginBody = () => ({ phone: '13800000001', smsRequestId, smsCode: '123456', clientId: sessionId, requestId: sessionId, agreementAccepted: true, timeZone: 'Asia/Shanghai' });
 
 describe('Studio behind unified gateway authentication', () => {
+  it('delegates the Studio login prompt to the gateway only for an authenticated browser session', async () => {
+    const { app } = await fixture();
+    const invalidHeaders: Record<string, string>[] = [{}, { cookie: 'huahuo-studio-access=unverified' }, { ...identityHeaders(), 'x-huahuo-user-id': 'invalid' }];
+    for (const headers of invalidHeaders) {
+      expect((await app.request('/studio-auth/capabilities', { headers })).status).toBe(401);
+    }
+    const response=await app.request('/studio-auth/capabilities', { headers: identityHeaders() });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ enabled: false, login: null });
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    const bearer=await app.request('/studio-auth/capabilities', { headers: { ...identityHeaders(), 'x-huahuo-auth-method': 'bearer' } });
+    expect(await bearer.json()).toEqual({ enabled: true, login: null });
+    expect((await app.request('/api/context', { headers: identityHeaders() })).status).toBe(200);
+    expect((await app.request('/api/context')).status).toBe(401);
+    const disabled=await fixture(false);
+    expect((await disabled.app.request('/studio-auth/capabilities', { headers: identityHeaders() })).status).toBe(404);
+    expect(await (await disabled.app.request('/api/auth/capabilities', { headers: identityHeaders() })).json()).toEqual({ enabled: true, login: null });
+  });
+
   it('keeps SMS/login contracts, writes prefixed cookies without verifying the token in Agent', async () => {
     const { app, requests } = await fixture();
     const sms = await app.request('/studio-auth/sms-code', json({ phone: '13800000001', requestId: sessionId }));
