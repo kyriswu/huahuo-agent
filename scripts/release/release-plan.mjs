@@ -37,7 +37,7 @@ export function validateReleasePlan(plan) {
   return reviewed;
 }
 
-function inspectReleasePlan(root, validate) {
+function inspectReleasePlan(root, validate, requireAncestor) {
   try {
     root = realpathSync(root);
     const git = args => execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
@@ -50,7 +50,10 @@ function inspectReleasePlan(root, validate) {
       readFileSync(resolve(root, file));
     }
     if (plan.baseRevision !== null) {
-      git(['merge-base', '--is-ancestor', plan.baseRevision, 'HEAD']);
+      git(['rev-parse', '--verify', `${plan.baseRevision}^{commit}`]);
+      // main may contain a squash of a deployed test merge. Review compares the
+      // actual deployed tree; only the ordinary test deploy requires ancestry.
+      if (requireAncestor) git(['merge-base', '--is-ancestor', plan.baseRevision, 'HEAD']);
       // These older standalone RAG migrations are not the Mastra runtime schema.
       // A shared-state change needs a separate, explicitly reviewed migration.
       if (git(['diff', '--name-only', plan.baseRevision, 'HEAD', '--', 'migrations/'])) fail();
@@ -62,8 +65,8 @@ function inspectReleasePlan(root, validate) {
   } catch { fail(); }
 }
 
-export const checkReleasePlan = (root = process.cwd()) => inspectReleasePlan(root, validateReleasePlan);
-export const checkReleaseReview = (root = process.cwd()) => inspectReleasePlan(root, reviewReleasePlan);
+export const checkReleasePlan = (root = process.cwd()) => inspectReleasePlan(root, validateReleasePlan, true);
+export const checkReleaseReview = (root = process.cwd()) => inspectReleasePlan(root, reviewReleasePlan, false);
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
