@@ -2,12 +2,13 @@ import { appendFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { resolveTestReleaseRevision } from './test-release-source.mjs';
 import { githubReader, readReleaseEventContext, REPOSITORY, verifyCiTrigger } from './release-events.mjs';
+import { reviewReleasePlan, validateReleasePlan } from './release-plan.mjs';
 const fail = code => { throw Error(code); };
 const controlFiles = new Set([
+  '.github/workflows/agent-ci.yml', 'scripts/release/release-plan.mjs', 'test/release/release-plan.test.ts',
   '.github/workflows/test-server-release.yml', '.github/workflows/main-release-readiness.yml',
   'scripts/release/release-events.mjs', 'scripts/release/test-release-source.mjs',
   'scripts/release/test-release-trigger.mjs', 'scripts/release/main-release-readiness.mjs',
-  'scripts/release/test-publish.mjs', 'test/release/test-publish.test.ts',
   'test/release/test-release-source.test.ts', 'test/release/release-events.test.ts',
   'test/release/test-release-trigger.test.ts', 'test/release/main-release-readiness.test.ts',
 ]);
@@ -44,7 +45,25 @@ export async function testReleaseIntent(context, read) {
 }
 export async function resolveTestReleaseTrigger(context, token, fetchImpl = fetch) {
   const revision = await resolveTestReleaseRevision(context, token, fetchImpl);
-  const intent = await testReleaseIntent(context, githubReader(token, fetchImpl));
+  const read = githubReader(token, fetchImpl);
+  let intent = await testReleaseIntent(context, read);
+  if (intent.deploy) {
+    // Read only the selected commit's JSON. Never execute candidate scripts on main.
+    const file = await read(`/contents/scripts/release/plan.json?ref=${revision.targetSha}`);
+    try {
+      if (file?.type !== 'file' || file.path !== 'scripts/release/plan.json' || file.encoding !== 'base64'
+        || !Number.isSafeInteger(file.size) || file.size < 1 || file.size > 65536
+        || typeof file.content !== 'string' || file.content.length > 90000
+        || !/^[A-Za-z0-9+/=\r\n]+$/.test(file.content)) fail('TEST_RELEASE_PLAN_INVALID');
+      const bytes = Buffer.from(file.content, 'base64');
+      if (bytes.length !== file.size) fail('TEST_RELEASE_PLAN_INVALID');
+      const plan = reviewReleasePlan(JSON.parse(bytes.toString('utf8')));
+      if (context.eventName === 'workflow_dispatch') validateReleasePlan(plan);
+      else if (Object.values(plan.compatibility).some(value => value !== true)) {
+        intent = { deploy: false, reason: 'incompatible-candidate', deferred: true };
+      }
+    } catch { fail('TEST_RELEASE_PLAN_INVALID'); }
+  }
   return { ...revision, ...intent };
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
@@ -53,9 +72,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     if (!process.env.GITHUB_ENV || !process.env.GITHUB_OUTPUT) fail('TEST_RELEASE_OUTPUT_REQUIRED');
     await appendFile(process.env.GITHUB_ENV, `TEST_RELEASE_SHA=${result.targetSha}\n`);
     await appendFile(process.env.GITHUB_OUTPUT, `deploy=${result.deploy}\n`);
-    console.log(JSON.stringify({ status: result.deploy ? 'candidate-verified' : 'skipped', ...result }));
+    console.log(JSON.stringify({ status: result.deploy ? 'candidate-verified' : result.deferred ? 'deferred' : 'skipped', ...result }));
     if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY,
-      `Test candidate: ${result.targetSha}\n\n${result.deploy ? 'CI/source verified; entering the existing five-stage release.' : 'No application change; no cloud command or deployment executed.'}\n`);
+      `Test candidate: ${result.targetSha}\n\n${result.deploy ? 'CI/source verified; entering the existing five-stage release.' : result.deferred ? 'Candidate reviewed but incompatible with ordinary deployment; this Agent requires a reviewed first-admission maintenance. No cloud credentials or command requested.' : 'No application change; no cloud command or deployment executed.'}\n`);
   } catch (error) {
     console.error(JSON.stringify({ status: 'failed', code: /^TEST_RELEASE_[A-Z_]+$/.test(error?.message) ? error.message : 'TEST_RELEASE_TRIGGER_FAILED' }));
     process.exitCode = 1;

@@ -22,6 +22,7 @@
     "rag:reconcile": "node --experimental-strip-types --env-file-if-exists=.env scripts/rag-reconcile.ts",
     "rag:acceptance:dense:mock": "node --experimental-strip-types --env-file-if-exists=.env scripts/rag-acceptance-dense.ts",
     "release:check": "node scripts/release/release-plan.mjs",
+    "release:review": "node scripts/release/release-plan.mjs --review",
     "release:smoke": "node scripts/release/smoke.mjs",
     "test:studio:built": "node scripts/studio-smoke.mjs"
   },

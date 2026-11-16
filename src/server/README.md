@@ -1,15 +1,35 @@
 # Server boundary
 
-External clients use one Traefik origin: `/api/v1/...` reaches Server and
-`/agent/api/...` reaches Agent's unchanged `/api/...` routes. Traefik performs
-ForwardAuth before stripping `/agent` from Agent API and custom login routes.
+External clients use one host Nginx origin: `/api/v1/...` reaches Server and
+`/agent/api/...` reaches Agent's unchanged `/api/...` routes. Nginx calls Server via native
+`auth_request` before stripping `/agent` from Agent API and custom login routes.
 Native Studio pages/assets keep `/agent` and use Mastra `server.studioBase`.
-Internal calls use `HUAHUO_SERVER_BASE_URL=http://api-server:3000` directly.
+Internal calls use `HUAHUO_SERVER_BASE_URL`, a stable private origin supplied
+by the deployment. It follows Server releases and contains no API/path suffix.
+
+Both internal listeners accept IP-based and service-name-based HTTP requests.
+For Agent → Server, set `HUAHUO_SERVER_BASE_URL` to either
+`http://<private-ip>:<port>` or `http://<service-name>:<port>`. In a shared Docker
+network, `http://api-server:3000` reaches Server directly; callers can likewise
+reach Agent at `http://agent:4111/api/...`, without the public `/agent` prefix.
+Separate Compose projects need a shared network or explicitly configured DNS
+to resolve one another's service names. Across hosts, use a reachable private
+host IP and published port, or a resolvable internal DNS name. Container IPs
+are not stable deployment addresses. Keep the public Studio origin separate.
+
+A direct instance address does not ensure uninterrupted updates. Callers that
+need release-independent routing use a stable logical service endpoint supplied
+by the deployment. Future Agent replicas sit behind that endpoint; applications
+do not select blue/green slots or maintain replica IP lists. Server currently has
+no outbound Agent business client, so there is no unused reverse-call URL setting.
+Agent's Server client has no automatic retry. The current single-port Agent
+release allows a short interruption; IP/name support does not imply zero-loss
+rolling updates or resumption of an interrupted model stream.
 
 ## Identity contract
 
 Server's `/internal/v1/gateway/auth` alone authenticates user JWTs and validates
-account/session state. Traefik removes incoming identity headers and injects:
+account/session state. Nginx removes incoming identity headers and injects:
 
 - `X-Huahuo-User-Id`: UUID.
 - `X-Huahuo-Session-Id`: UUID.
@@ -37,11 +57,11 @@ Set `HUAHUO_AGENT_PUBLIC_PATH=/agent` in Agent, Server and gateway. Set
 
 Agent serves the login/legal UI and uses Server's existing login/SMS APIs. It
 writes HttpOnly/SameSite cookies using the token expiry returned by Server;
-it does not verify JWTs. Server ForwardAuth reads those cookies and performs
+it does not verify JWTs. Server admission reads those cookies and performs
 refresh with single-instance concurrent-request deduplication. Studio is a test
-tool: reconnect/login again after a blue/green cutover if necessary; cross-instance
+tool: reconnect/login again after a release or restart if necessary; cross-instance
 refresh coordination is intentionally not implemented. Studio routes are absent
-on the main gateway branch. Gateway passes updated cookies
+on the main ingress. Nginx passes updated cookies
 back to the browser. Cookie Path is `/agent`; old `Path=/` cookies are cleared.
 Cookie requests keep same-origin checks. Public logout is routed directly to
 Server's auth adapter so expired credentials can still clear browser cookies.
@@ -51,14 +71,25 @@ application's `public-prefix.ts` middleware adapts only the served HTML runtime
 API-prefix configuration to `/agent/api` and detects incompatible templates.
 No Mastra source, package assets, or build outputs are patched. On upgrades run
 typecheck, tests (including installed-template and native ownership tests),
-build with Studio, and gateway smoke for login, HTML/assets/API and streaming.
+build with Studio, and the installed-image HTTP smoke. Host ingress routing is
+validated by its own maintenance process.
 
-## Coordinated rollout
+## Independent release
 
-This is an internal authentication contract change. Ship matching Server,
-Agent and gateway configurations together; do not deploy Agent alone against an
-old Server. Remove Agent `APP_JWT_*` and both directional `HUAHUO_*_API_KEY`
-settings. Server retains its JWT issuance/verification keys for ForwardAuth.
-Update the persisted gateway auth configuration using Server's documented
-`sync-auth-config` operation while retaining the selected API slot. Preserve
-existing application networking. This local change does not perform deployment.
+Agent releases independently. Before replacing Agent, its executor verifies the
+configured Server readiness and admission contract. It does not read Server Git
+refs, release records or containers. A missing/incompatible dependency blocks
+the release before Mastra storage initialization or stopping the current Agent. Remove Agent `APP_JWT_*` and both directional `HUAHUO_*_API_KEY`
+settings. Server retains its JWT issuance/verification keys for its admission endpoint.
+The host keeps Nginx, certificates, routing and upstream selection outside both
+application repositories. Server and Agent keep their own application listeners
+and existing data connections. Local code changes do not install or reload the
+host ingress.
+
+Nginx auth subrequests receive only 204/401/403 (or fail-closed 5xx). Server
+returns a separate login redirect hint on denied Studio HTML navigation and
+four named Cookie headers when rotating/clearing browser tokens. Nginx turns
+these into browser redirects and separate Set-Cookie headers. Agent receives
+only trusted identity and does not interpret these internal response headers.
+Public `/agent/studio-auth/logout` is handled entirely by Server. Agent has no
+duplicate logout route or unauthenticated Studio redirect fallback.
