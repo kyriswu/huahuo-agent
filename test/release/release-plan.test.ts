@@ -11,6 +11,11 @@ import { validateReleasePlan, reviewReleasePlan, checkReleasePlan, checkReleaseR
 const plan = () => {
   const value = JSON.parse(readFileSync(new URL('../../scripts/release/plan.json', import.meta.url), 'utf8'));
   value.compatibility = { database: true, api: true, configuration: true, skills: true };
+  // Exercise a changed-config fixture independently of the current real release
+  // choosing to reuse its previously verified immutable configuration.
+  value.configuration.mode = 'candidate';
+  value.configuration.changes = [{ key: 'FIXTURE_CONFIG', operation: 'change', required: true }];
+  value.configuration.verifyFile = `scripts/release/changes/${value.id}/verify-config.mjs`;
   return value;
 };
 describe('Agent release plan', () => {
@@ -30,6 +35,10 @@ describe('Agent release plan', () => {
   it('requires compatibility review and a local assertion for changed configuration', () => {
     const p = plan(); delete p.configuration.verifyFile; expect(() => validateReleasePlan(p)).toThrow();
     const q = plan(); q.compatibility.database = false; expect(() => validateReleasePlan(q)).toThrow();
+  });
+  it('allows an ordinary release to reuse verified configuration without a new assertion', () => {
+    const p = plan(); p.configuration.mode = 'reuse'; p.configuration.changes = []; delete p.configuration.verifyFile;
+    expect(validateReleasePlan(p).configuration.mode).toBe('reuse');
   });
   it('reviews declared incompatibility without granting deployment or accepting missing/mistyped decisions', () => {
     const p = plan(); p.compatibility.api = false;

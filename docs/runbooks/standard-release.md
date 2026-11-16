@@ -55,12 +55,12 @@ GitHub test/production 仅允许 main 控制流程。OIDC Provider 复用已验�
 
 Agent独立发布和恢复，不执行Server发布流程。宿主入口调整独立于应用发布。Agent 的 JWT/ServiceKey 认证已移除，业务沿用可信身份头和原生 Mastra 资源隔离。Studio 登录继续由 Agent 提供 UI，跳转、刷新、退出由 Server 与入口处理；Agent 不再保留另一套退出和匿名导航重定向逻辑。
 
-`HUAHUO_SERVER_BASE_URL` 使用稳定内部 origin，`HUAHUO_STUDIO_ORIGIN` 使用浏览器 origin，`HUAHUO_AGENT_PUBLIC_PATH=/agent` 两端一致。项目只维护应用契约；Nginx 配置与宿主切流脚本位于仓库外。当前清单 api/configuration 保持 false，表示本项目的新接入配置与接口契约仍待验收，不代表必须与Server绑定发布。此门禁不表示代码测试失败。
+`HUAHUO_SERVER_BASE_URL` 使用稳定内部 origin，`HUAHUO_STUDIO_ORIGIN` 使用浏览器 origin，`HUAHUO_AGENT_PUBLIC_PATH=/agent` 两端一致。项目只维护应用契约；Nginx 配置与宿主切流脚本位于仓库外。首次候选的api/configuration曾保持false，表示当时新接入契约未验收；首次独立维护完成后，以真实成功基准与已验证配置恢复正常更新。这不代表Server与Agent绑定发布。
 
 ## 执行器升级与首次接入
 
 宿主执行器v2与部署代码独立维护，固定云命令仍只接受准确test SHA。它增加Server契约预检、匿名API拒绝检查、同锁恢复和原子成功记录。执行器的候选、备份及无Docker模拟验证记录在宿主维护目录；安装、目标实际执行结果另记，不能把本地测试当成已经替换宿主。
 
-本期从旧JWT/ServiceKey调用方式改为可信身份协议，api/configuration兼容项保留false。普通自动入口因此deferred。首次接入由一次性、固定应用/控制SHA与实际基准的独立维护执行；维护先验证Server接口和完整候选配置，仍只操作Agent，不执行Server发布或修改宿主Nginx。完成后登记实际成功SHA，后续版本才以该基准恢复普通自动发布。不存在通用force或跳过数据库兼容的开关。
+首次从旧JWT/ServiceKey调用方式改为可信身份协议时，候选api/configuration保留false，普通自动入口因此deferred。首次接入由一次性、固定应用/控制SHA与实际基准的独立维护执行；维护先验证Server接口和完整候选配置，仍只操作Agent，不执行Server发布或修改宿主Nginx。完成后登记实际成功SHA，后续版本才以该基准恢复普通自动发布。不存在通用force或跳过数据库兼容的开关。
 
 恢复使用上一成功镜像、不可变配置及旧控制Compose，只能证明原进程恢复；首次接口破坏性接入时，旧二进制未必兼容当前Server，不能把进程健康称为完整业务恢复。数据库已由Mastra提交的变化不会回退。恢复失败保留现场与failure.json，不自动重发发布命令。
