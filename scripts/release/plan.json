@@ -10,7 +10,7 @@
   },
   "configuration": {
     "mode": "candidate",
-    "reviewedFiles": [".env.example", "compose.yaml", "src/mastra/index.ts", "src/mastra/model-config.ts", "src/auth/service-key.ts", "src/studio/config.ts"],
+    "reviewedFiles": [".env.example", "compose.yaml", "src/mastra/index.ts", "src/mastra/model-config.ts", "src/auth/service-key.ts", "src/studio/config.ts", "test/auth.test.ts", ".github/workflows/agent-ci.yml"],
     "changes": [
       { "key": "APP_ENV", "operation": "change", "required": true },
       { "key": "MASTRA_POSTGRES_PASSWORD", "operation": "add", "required": true },
