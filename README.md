@@ -403,7 +403,7 @@ port. This check does not verify PostgreSQL persistence.
 For test Studio, enable `HUAHUO_STUDIO_AUTH_ENABLED=true` on both Agent and
 Server with `APP_ENV=development` or `test`, then open `/agent/studio-login` on
 the gateway origin. The existing Server SMS/login APIs issue the tokens;
-Agent writes HttpOnly cookies without local JWT verification. ForwardAuth
+Agent writes HttpOnly cookies without local JWT verification. Server admission
 performs account/session checks and cookie refresh. Authenticated identity,
 not the token, flows to tools and native resource-scoped memory.
 
@@ -418,7 +418,7 @@ Set `HUAHUO_STUDIO_ORIGIN` to the browser-facing origin without a path and
 Logout is mapped to Server's cookie-aware auth adapter so an expired login can
 still clear cookies and revoke its session. Native Studio assets use the
 framework's subpath support; no package files are patched. See the
-[identity contract](src/server/README.md) for coordinated configuration and
+[identity contract](src/server/README.md) for independent release configuration and
 upgrade verification. Phone login remains disabled in production.
 
 ## Docker service
@@ -456,7 +456,7 @@ of `local`.
 
 The image includes Studio by default. Set `MASTRA_STUDIO_PATH=/app/studio`
 and `HUAHUO_AGENT_PUBLIC_PATH=/agent` in `.env`, then open `/agent/` on the shared
-Traefik origin. Studio uses native `studioBase` for its pages and assets; a small
+Nginx origin. Studio uses native `studioBase` for its pages and assets; a small
 application middleware sets its browser API prefix to `/agent/api`. Internal API
 routes remain `/api`; health remains `/health`. The installed Studio template is
 checked by `test/studio-prefix.test.ts` on Mastra upgrades.
@@ -487,28 +487,22 @@ If the development server already uses port 4111, choose another host port:
 AGENT_PORT=4112 docker compose up -d --no-build
 ```
 
-By default the published port binds to `127.0.0.1`. Set
-`AGENT_BIND_ADDRESS=0.0.0.0` when the API needs to be reachable from other hosts.
+By default the published port binds to `127.0.0.1`. Use a restricted private bind address and source access controls when trusted
+ingress needs to reach Agent from another host.
 These Compose variables can be supplied in the shell or `.env`.
 The runtime env file uses Compose's `raw` format (Compose 2.30 or later), so
 write values without surrounding quotes; dollar signs in passwords and keys
 are preserved.
 
-The Server and PostgreSQL run separately. For local container communication,
-set these values in `.env` to join the existing Server network:
+The Server and PostgreSQL run separately. Set `HUAHUO_SERVER_BASE_URL` to the
+stable private origin maintained by the deployment, without `/api` or `/agent`.
+Public and internal API traffic must follow the same selected Server instance
+when a release switches. Do not pin Agent to a temporary release container.
 
-```dotenv
-HUAHUO_SERVER_BASE_URL=http://api-server:3000
-HUAHUO_AGENT_NETWORK=huahuo-server-dev_backend
-HUAHUO_AGENT_NETWORK_EXTERNAL=true
-```
-
-For deployment on separate hosts, set the Server URL to the internal
-Server address, `HUAHUO_AGENT_NETWORK=huahuo-agent_default`, and
-`HUAHUO_AGENT_NETWORK_EXTERNAL=false`. Compose then creates the Agent's own
-network. Set `AGENT_BIND_ADDRESS` to the required listening address and fill
-in the deployment's `MASTRA_POSTGRES_*` values. A `localhost` URL inside the
-Agent would point back to the Agent container.
+The Agent may keep its own Docker network. Use the existing shared network only
+when that deployment requires it; a stable private IP and port work across
+hosts. Keep the Agent listener restricted to trusted ingress/internal callers.
+A `localhost` URL inside the Agent container points back to Agent itself.
 
 The image uses Node.js `26.12.1` (within the project's Node.js 26 engine range),
 is built from locked dependencies in a separate build stage, and runs as the
@@ -535,9 +529,8 @@ See [team releases](docs/runbooks/team-releases.md) and the
 
 ## Unified identity and single-domain routing
 
-External requests authenticate through Server ForwardAuth at Traefik. Agent no
+External requests authenticate through the Server auth_request endpoint at host Nginx. Agent no
 longer verifies JWTs or uses directional ServiceKeys. User/session identity is
 passed in reserved headers and mapped to Mastra native resource ownership; model
-inputs cannot choose a different identity. Internal calls use the Server address
-directly. See [identity contract](src/server/README.md) for routing, coordinated
+inputs cannot choose a different identity. Internal calls use a stable private Server origin. See [identity contract](src/server/README.md) for routing, independent release
 configuration, Studio cookies, and upgrade checks.

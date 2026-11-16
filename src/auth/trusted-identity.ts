@@ -34,7 +34,7 @@ function header(headers: TrustedIdentityHeaders, name: string): string | undefin
 }
 
 /** Read identity asserted by the gateway or an authorized internal caller.
- * JWT verification and session/account validation belong to ForwardAuth.
+ * JWT verification and session/account validation belong to the Server admission endpoint.
  * Authorization, including memory ownership, still belongs to each service.
  */
 export function readTrustedIdentity(headers: TrustedIdentityHeaders): TrustedHuahuoIdentity {

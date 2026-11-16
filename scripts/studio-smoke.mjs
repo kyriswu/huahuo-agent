@@ -17,6 +17,8 @@ try{
  assert(ready,'BUILT_SERVER_NOT_READY');
  const request=(path,withIdentity=true)=>fetch(base+path,{headers:withIdentity?headers:{},redirect:'manual',signal:AbortSignal.timeout(4000)});
  assert.equal((await request('/api/agents',false)).status,401);
+ assert.equal((await request('/agent/',false)).status,401);
+ const logout=await fetch(base+'/studio-auth/logout',{method:'POST',headers,redirect:'manual'});assert.equal(logout.status,404);
  const login=await request('/studio-login',false);assert.equal(login.status,200);assert((await login.text()).includes('/agent/studio-auth/'));
  const page=await request('/agent/');assert.equal(page.status,200);const html=await page.text();
  assert(html.includes('<base href="/agent/"'),'BASE_PATH_MISSING');

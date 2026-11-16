@@ -14,6 +14,7 @@ COPY tsconfig.json ./
 COPY src ./src
 COPY skills ./skills
 COPY scripts/release/smoke.mjs ./release/smoke.mjs
+COPY scripts/release/server-preflight.mjs scripts/release/runtime-check.mjs ./release/
 COPY scripts/release/changes ./release/changes
 ARG MASTRA_BUILD_STUDIO=true
 RUN export NODE_OPTIONS=--max-old-space-size=768 \

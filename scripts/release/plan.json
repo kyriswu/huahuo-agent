@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "id": "20261116-agent-gateway-auth",
+  "id": "20261116-agent-native-ingress",
   "baseRevision": "b491b5e75f24fa47db40c110518180e75e8007b0",
   "services": [
     "agent"
@@ -20,7 +20,14 @@
       "src/auth/mastra-auth.ts",
       "src/studio/config.ts",
       "src/studio/public-prefix.ts",
-      "src/studio/identity-client.ts"
+      "src/studio/identity-client.ts",
+      "src/server/base-url.ts",
+      "src/studio/gateway.ts",
+      "src/studio/token-bridge.ts",
+      "Dockerfile",
+      "scripts/release/server-preflight.mjs",
+      "scripts/release/runtime-check.mjs",
+      "src/mastra/tools/huahuo-rag-query-tool.ts"
     ],
     "changes": [
       {
@@ -54,19 +61,28 @@
         "required": true
       },
       {
+        "key": "HUAHUO_STUDIO_AUTH_ENABLED",
+        "operation": "change",
+        "required": true
+      },
+      {
         "key": "HUAHUO_STUDIO_ORIGIN",
+        "operation": "change",
+        "required": true
+      },
+      {
+        "key": "HUAHUO_SERVER_BASE_URL",
         "operation": "change",
         "required": true
       }
     ],
-    "verifyFile": "scripts/release/changes/20261116-agent-gateway-auth/verify-config.mjs"
+    "verifyFile": "scripts/release/changes/20261116-agent-native-ingress/verify-config.mjs"
   },
   "compatibility": {
     "database": true,
-    "api": true,
-    "configuration": true,
+    "api": false,
+    "configuration": false,
     "skills": true
   },
-  "smoke": "health",
-  "coordination": "Requires matching Server trusted identity and Traefik ForwardAuth/header routing before cutover; no independent Agent rollout. External business routes and payloads unchanged."
+  "smoke": "health"
 }

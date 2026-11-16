@@ -39,7 +39,6 @@ async function fixture() {
       accessTokenExpiresAt: new Date(Date.now() + 900_000).toISOString(),
       user: { userId: alice, displayName: 'Alice', phoneMasked: '138****0001' },
     } });
-    if (path === '/api/v1/auth/logout') return Response.json({ success: true, data: { revoked: true } });
     if (path === '/internal/v1/rag/query') return Response.json({ owner: headers.get('x-huahuo-user-id') });
     throw new Error('Unexpected isolated destination');
   }));
@@ -81,8 +80,8 @@ describe('Studio behind unified gateway authentication', () => {
   it('requires gateway identity even if a JWT or cookie is present and preserves user isolation', async () => {
     const { app, requests } = await fixture();
     const anonymous = await app.request('/agent/');
-    expect(anonymous.status).toBe(302);
-    expect(anonymous.headers.get('location')).toBe('/agent/studio-login');
+    expect(anonymous.status).toBe(401);
+    expect(anonymous.headers.get('location')).toBeNull();
     for (const headers of [{}, { authorization: 'Bearer token' }, { cookie: 'huahuo-studio-access=token' }]) {
       expect((await app.request('/api/context', { headers: headers as HeadersInit })).status).toBe(401);
     }
@@ -98,34 +97,20 @@ describe('Studio behind unified gateway authentication', () => {
     expect(forwarded.headers.has('x-huahuo-service-key')).toBe(false);
   });
 
-  it('clears cookies with or without a valid identity; trusted direct logout uses Scope headers', async () => {
+  it('has no duplicate logout implementation; the ingress routes logout to Server', async () => {
     const { app, requests } = await fixture();
     const result = await app.request('/studio-auth/logout', json({}, identityHeaders()));
-    expect(result.status).toBe(200);
-    expect(result.headers.getSetCookie().every(c => c.includes('Max-Age=0'))).toBe(true);
-    expect(requests[0].headers.get('x-huahuo-session-id')).toBe(sessionId);
-    expect(requests[0].headers.has('authorization')).toBe(false);
-    expect((await app.request('/studio-auth/logout', json({}))).status).toBe(200);
-    expect(requests).toHaveLength(1);
+    expect(result.status).toBe(404);
+    expect(result.headers.getSetCookie()).toHaveLength(0);
+    expect(requests).toHaveLength(0);
   });
 
   it('keeps cookie same-origin protection and rejects invalid inputs before contacting Server', async () => {
     const { app, requests } = await fixture();
     expect((await app.request('/studio-auth/sms-code', json({ phone: '13800000001', requestId: sessionId }, { origin: 'https://other.test' }))).status).toBe(403);
-    expect((await app.request('/studio-auth/logout', json({}, { origin: 'https://other.test' }))).status).toBe(403);
     expect((await app.request('/studio-auth/sms-code', json({ phone: '123', requestId: sessionId }))).status).toBe(400);
     expect((await app.request('/studio-auth/login', json({ ...loginBody(), agreementAccepted: false }))).status).toBe(400);
     expect(requests).toHaveLength(0);
-  });
-
-  it('clears local cookies but reports a Server outage during trusted logout', async () => {
-    const { app } = await fixture();
-    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ success: false, error: { code: 'SERVER_UNAVAILABLE' } }, { status: 503 })));
-    const result = await app.request('/studio-auth/logout', json({}, identityHeaders()));
-    expect(result.status).toBe(503);
-    expect(await result.json()).toEqual({ error: { code: 'SERVER_UNAVAILABLE' } });
-    expect(result.headers.getSetCookie()).toHaveLength(4);
-    expect(result.headers.getSetCookie().every(c => c.includes('Max-Age=0'))).toBe(true);
   });
 
   it('generates prefixed login requests, links and redirects with valid script and CSP', async () => {
@@ -146,7 +131,8 @@ describe('Studio behind unified gateway authentication', () => {
     expect(loadStudioLoginConfig({ APP_ENV: 'test' })).toMatchObject({ enabled: false, publicPath: '/agent' });
     expect(() => loadStudioLoginConfig({ APP_ENV: 'production', HUAHUO_STUDIO_AUTH_ENABLED: 'true' })).toThrow('TEST_ENVIRONMENT');
     for (const path of ['/a/../b', '//evil', '/a?b', '/a\"']) expect(() => loadStudioLoginConfig({ HUAHUO_AGENT_PUBLIC_PATH: path })).toThrow('PUBLIC_PATH_INVALID');
-    expect(tokenCookies(undefined, true).every(c => c.includes('Max-Age=0') && c.includes('Secure'))).toBe(true);
+    const cookies = tokenCookies({ accessToken: 'opaque', refreshToken: 'opaque-refresh', accessTokenExpiresAt: new Date(Date.now() + 60_000).toISOString() }, true);
+    expect(cookies.every(c => c.includes('Secure') && c.includes('HttpOnly'))).toBe(true);
   });
 
   it('does not leak upstream errors or retry stateful authentication requests', async () => {

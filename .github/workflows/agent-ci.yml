@@ -38,8 +38,8 @@ jobs:
           pnpm install --frozen-lockfile
       - name: Typecheck
         run: pnpm typecheck
-      - name: Validate release plan
-        run: pnpm release:check
+      - name: Review release plan without granting deployment
+        run: pnpm release:review
       - name: Unit, contract and release tests (isolated fixtures)
         run: pnpm test
       - name: Build API and Studio

@@ -1,4 +1,4 @@
-const localHosts = new Set(['localhost', '127.0.0.1', '::1']);
+const localHosts = new Set(['localhost', '127.0.0.1', '[::1]']);
 
 export function resolveHuahuoServerBaseUrl(
   explicitUrl?: string,
@@ -12,12 +12,12 @@ export function resolveHuahuoServerBaseUrl(
 
   let parsed: URL;
   try {
-    parsed = new URL(raw);
+    parsed = new URL(raw.replace(/\/+$/, ''));
   } catch {
     throw new Error('HUAHUO_SERVER_BASE_URL_INVALID');
   }
 
-  if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password) {
+  if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password || parsed.pathname !== '/' || parsed.search || parsed.hash) {
     throw new Error('HUAHUO_SERVER_BASE_URL_INVALID');
   }
   if (env.APP_ENV === 'production' && localHosts.has(parsed.hostname.toLowerCase())) {

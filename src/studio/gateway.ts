@@ -62,20 +62,16 @@ export function createStudioGateway(
   const middleware: Middleware = async (c, next) => {
     const path = c.req.path;
     const publicRoute = (c.req.method === 'GET' && (path === '/studio-login' || /^\/studio-auth\/legal\/(agreement|privacy)$/u.test(path)))
-      || (c.req.method === 'POST' && ['/studio-auth/login', '/studio-auth/sms-code', '/studio-auth/logout'].includes(path));
+      || (c.req.method === 'POST' && ['/studio-auth/login', '/studio-auth/sms-code'].includes(path));
     if (publicRoute || path.startsWith('/internal/') || ['/health', '/api', '/api/health', '/api/status'].includes(path)) return next();
     try {
       const user = authenticate(c);
-      // ForwardAuth already checks browser-cookie origins. Trusted internal
+      // Server admission already checks browser-cookie origins. Trusted internal
       // delegation carries identity, not browser Origin/Cookie headers.
       const context = c.get('requestContext');
       if (context) applyTrustedIdentity(context, user);
       return next();
     } catch (error) {
-      if (config.enabled && ['GET', 'HEAD'].includes(c.req.method)
-        && (path === config.publicPath || path === `${config.publicPath}/`)) {
-        return c.redirect(`${config.publicPath}/studio-login`);
-      }
       return failure(error);
     }
   };
@@ -118,23 +114,6 @@ export function createStudioGateway(
           const principal = authenticate(c);
           return c.json({ userId: principal.userId }, 200, { 'cache-control': 'no-store' });
         } catch (error) { return failure(error); }
-      },
-    }),
-    registerApiRoute('/studio-auth/logout', {
-      method: 'POST', requiresAuth: false, handler: async c => {
-        try { assertSameOrigin(c, config); } catch (error) { return failure(error); }
-        // Public logout is handled by Server's gateway adapter. This direct
-        // endpoint also clears expired cookies and reports revocation outages.
-        let user;
-        try { user = authenticate(c); } catch { /* No valid browser identity. */ }
-        let error: unknown;
-        try { if (user) await identity.logout(user); }
-        catch (caught) {
-          if (!(caught instanceof StudioLoginError && caught.status === 401)) error = caught;
-        }
-        const response = error ? failure(error) : Response.json({ signedOut: true }, { headers: { 'cache-control': 'no-store' } });
-        for (const cookie of tokenCookies(undefined, origin(c, config).startsWith('https:'), config.publicPath)) response.headers.append('Set-Cookie', cookie);
-        return response;
       },
     }),
   ] : [];

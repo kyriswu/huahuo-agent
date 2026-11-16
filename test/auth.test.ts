@@ -159,6 +159,11 @@ describe('direct Server client', () => {
 
   it('retains explicit Server base URL validation', () => {
     expect(resolveHuahuoServerBaseUrl('http://api-server:3000///', { APP_ENV: 'production' })).toBe('http://api-server:3000');
+    expect(resolveHuahuoServerBaseUrl('http://10.0.0.8:13001', { APP_ENV: 'test' })).toBe('http://10.0.0.8:13001');
+    for (const value of ['https://server.test/agent', 'https://server.test/api/v1', 'https://server.test?token=fixture', 'https://server.test#fragment']) {
+      expect(() => resolveHuahuoServerBaseUrl(value)).toThrow('HUAHUO_SERVER_BASE_URL_INVALID');
+    }
+    expect(() => resolveHuahuoServerBaseUrl('http://[::1]:13001', { APP_ENV: 'production' })).toThrow('HUAHUO_SERVER_BASE_URL_PRODUCTION_INVALID');
     expect(() => resolveHuahuoServerBaseUrl(undefined, { APP_ENV: 'production' })).toThrow('HUAHUO_SERVER_BASE_URL_REQUIRED');
     expect(() => resolveHuahuoServerBaseUrl('http://localhost:3000', { APP_ENV: 'production' })).toThrow('HUAHUO_SERVER_BASE_URL_PRODUCTION_INVALID');
   });
