@@ -1,16 +1,16 @@
 import { createServer } from 'node:http';
 import { generateKeyPair, SignJWT, exportJWK } from 'jose';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createHuahuoJwtVerifier, loadHuahuoJwtConfig } from '../src/auth/jwt.js';
 import { validateAgentServiceAuthConfig, verifyServerToAgentServiceKey } from '../src/auth/service-key.js';
 import { HuahuoServerClient } from '../src/server/huahuo-server-client.js';
 import { resolveHuahuoServerBaseUrl } from '../src/server/base-url.js';
 import { RequestContext } from '@mastra/core/request-context';
-import { huahuoAuth } from '../src/auth/mastra-auth.js';
 
 const servers: Array<ReturnType<typeof createServer>> = [];
 
 afterEach(async () => {
+  vi.unstubAllEnvs();
   await Promise.all(servers.splice(0).map(server => new Promise<void>(resolve => server.close(() => resolve()))));
 });
 
@@ -54,8 +54,20 @@ async function sign(privateKey: CryptoKey, overrides: Record<string, unknown> = 
 }
 
 describe('Agent JWT verification', () => {
-  it('protects every Agent API route in every environment', () => {
-    expect(huahuoAuth.protected).toContain('/api/*');
+  it.each(['production', 'test', 'development', undefined])('selects the intended API authentication for %s', async appEnv => {
+    vi.stubEnv('APP_ENV', appEnv);
+    vi.stubEnv('HUAHUO_SERVER_BASE_URL', 'http://api-server:3000');
+    vi.stubEnv('APP_JWT_JWKS_URL', 'http://api-server:3000/.well-known/jwks.json');
+    vi.resetModules();
+    const { huahuoAuth, huahuoApiAuthRequired } = await import('../src/auth/mastra-auth.js');
+    if (appEnv === 'test' || appEnv === 'development') {
+      expect(huahuoApiAuthRequired).toBe(false);
+      expect(huahuoAuth.public).toContain('/api/*');
+    } else {
+      expect(huahuoApiAuthRequired).toBe(true);
+      expect(huahuoAuth.protected).toContain('/api/*');
+      expect(huahuoAuth.public).not.toContain('/api/*');
+    }
   });
 
   it('rejects localhost JWKS configuration in production', () => {
