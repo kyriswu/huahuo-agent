@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "id": "20261116-agent-native-ingress",
-  "baseRevision": "b491b5e75f24fa47db40c110518180e75e8007b0",
+  "id": "20261116-agent-ingress-ready",
+  "baseRevision": "17bf961e709c69dcb9d6ee52904e8c406abb07d4",
   "services": [
     "agent"
   ],
@@ -11,7 +11,7 @@
     "dataChange": "none"
   },
   "configuration": {
-    "mode": "candidate",
+    "mode": "reuse",
     "reviewedFiles": [
       ".env.example",
       "compose.yaml",
@@ -29,59 +29,12 @@
       "scripts/release/runtime-check.mjs",
       "src/mastra/tools/huahuo-rag-query-tool.ts"
     ],
-    "changes": [
-      {
-        "key": "APP_JWT_JWKS_URL",
-        "operation": "remove",
-        "required": false
-      },
-      {
-        "key": "APP_JWT_ISSUER",
-        "operation": "remove",
-        "required": false
-      },
-      {
-        "key": "APP_JWT_AUDIENCE",
-        "operation": "remove",
-        "required": false
-      },
-      {
-        "key": "HUAHUO_SERVER_TO_AGENT_API_KEY",
-        "operation": "remove",
-        "required": false
-      },
-      {
-        "key": "HUAHUO_AGENT_TO_SERVER_API_KEY",
-        "operation": "remove",
-        "required": false
-      },
-      {
-        "key": "HUAHUO_AGENT_PUBLIC_PATH",
-        "operation": "add",
-        "required": true
-      },
-      {
-        "key": "HUAHUO_STUDIO_AUTH_ENABLED",
-        "operation": "change",
-        "required": true
-      },
-      {
-        "key": "HUAHUO_STUDIO_ORIGIN",
-        "operation": "change",
-        "required": true
-      },
-      {
-        "key": "HUAHUO_SERVER_BASE_URL",
-        "operation": "change",
-        "required": true
-      }
-    ],
-    "verifyFile": "scripts/release/changes/20261116-agent-native-ingress/verify-config.mjs"
+    "changes": []
   },
   "compatibility": {
     "database": true,
-    "api": false,
-    "configuration": false,
+    "api": true,
+    "configuration": true,
     "skills": true
   },
   "smoke": "health"
