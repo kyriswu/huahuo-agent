@@ -93,3 +93,12 @@ these into browser redirects and separate Set-Cookie headers. Agent receives
 only trusted identity and does not interpret these internal response headers.
 Public `/agent/studio-auth/logout` is handled entirely by Server. Agent has no
 duplicate logout route or unauthenticated Studio redirect fallback.
+
+For a gateway-validated browser cookie session, the ingress maps Studio's
+`GET /agent/api/auth/capabilities` to Agent's `/studio-auth/capabilities`, which
+declares its built-in login UI inactive. The
+external gateway already owns browser sign-in; this prevents Studio from asking
+for a second Authorization header. Anonymous requests still receive 401, native
+Bearer capability response contract is checked against the native endpoint, and all business API authentication
+and resource ownership checks remain active. The built-artifact smoke checks
+this path with `NODE_ENV=production`, matching the deployed test container.

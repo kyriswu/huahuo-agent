@@ -108,6 +108,17 @@ export function createStudioGateway(
         } catch (error) { return failure(error); }
       },
     }),
+    registerApiRoute('/studio-auth/capabilities', {
+      method: 'GET', requiresAuth: false, handler: c => {
+        try {
+          const principal = authenticate(c);
+          // The ingress maps Studio's capabilities request here. The native
+          // framework-public auth route intentionally skips user middleware.
+          // Browser login is owned by the gateway; API auth remains native.
+          return c.json({ enabled: principal.authMethod !== 'cookie', login: null }, 200, { 'cache-control': 'no-store' });
+        } catch (error) { return failure(error); }
+      },
+    }),
     registerApiRoute('/studio-auth/session', {
       method: 'GET', requiresAuth: false, handler: async c => {
         try {
