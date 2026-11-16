@@ -10,11 +10,10 @@ import { weatherWorkflow } from './workflows/weather-workflow.ts';
 import { huahuoRagQueryTool } from './tools/huahuo-rag-query-tool.ts';
 import { weatherTool } from './tools/weather-tool.ts';
 import { deepseekWebTools } from './tools/mcp/index.ts';
-import { huahuoApiAuthRequired, huahuoAuth, huahuoAuthMiddleware, huahuoServiceAuthMiddleware } from '../auth/mastra-auth.ts';
-import { validateAgentServiceAuthConfig } from '../auth/service-key.ts';
+import { huahuoAuth, huahuoAuthMiddleware } from '../auth/mastra-auth.ts';
 import { createStudioGateway } from '../studio/gateway.ts';
-
-validateAgentServiceAuthConfig();
+import { agentPublicPath } from '../studio/config.ts';
+import { createStudioPrefixMiddleware } from '../studio/public-prefix.ts';
 
 function createPostgresStorage() {
   const password = process.env.MASTRA_POSTGRES_PASSWORD?.trim();
@@ -40,10 +39,11 @@ export const mastra = new Mastra({
   ...(storage ? { storage } : {}),
   editor: new MastraEditor(),
   server: {
+    studioBase: agentPublicPath(),
     mcp: { enabled: false },
-    ...(huahuoApiAuthRequired ? { auth: huahuoAuth } : {}),
+    auth: huahuoAuth,
     apiRoutes: studioGateway.routes,
-    middleware: [...(studioGateway.enabled ? [studioGateway.middleware] : []), huahuoServiceAuthMiddleware, huahuoAuthMiddleware],
+    middleware: [createStudioPrefixMiddleware(agentPublicPath()), studioGateway.middleware, huahuoAuthMiddleware],
   },
   agents: { huoxAgent, weatherAgent },
   tools: { huahuoRagQueryTool, weatherTool, ...deepseekWebTools },

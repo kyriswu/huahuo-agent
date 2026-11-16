@@ -1,50 +1,64 @@
 # Server boundary
 
-Mastra owns the HTTP/SSE runtime. Authentication is configured in
-`src/auth/mastra-auth.ts`; this directory contains the outbound Server client.
+External clients use one Traefik origin: `/api/v1/...` reaches Server and
+`/agent/api/...` reaches Agent's unchanged `/api/...` routes. Traefik performs
+ForwardAuth before stripping `/agent` from Agent API and custom login routes.
+Native Studio pages/assets keep `/agent` and use Mastra `server.studioBase`.
+Internal calls use `HUAHUO_SERVER_BASE_URL=http://api-server:3000` directly.
 
-Set `HUAHUO_SERVER_BASE_URL` to the Server root URL. Use
-`http://localhost:3000` for a host process, or the Compose service name such as
-`http://api-server:3000` when Agent and Server share a network. Set
-`APP_JWT_JWKS_URL` separately to the Server JWKS endpoint; localhost is accepted
-only for local development.
+## Identity contract
 
-## Server authentication
+Server's `/internal/v1/gateway/auth` alone authenticates user JWTs and validates
+account/session state. Traefik removes incoming identity headers and injects:
 
-The Agent uses the shared user JWT issued by `huahuo-server` for user requests.
-It verifies the token locally through `APP_JWT_JWKS_URL` using EdDSA/Ed25519,
-issuer `huahuo-server`, audience `huahuo-agent`, and the `kid` selected from JWKS.
+- `X-Huahuo-User-Id`: UUID.
+- `X-Huahuo-Session-Id`: UUID.
+- `X-Huahuo-Auth-Method`: `bearer` or `cookie`.
+- `X-Trace-Id`: request correlation ID (generated if absent).
 
-When the Agent calls a user-scoped Server API, it sends both headers:
+Agent reads these headers in every environment and retains native Mastra auth
+and `mapUserToResourceId`. Tools obtain identity from the reserved Mastra
+provider-user context, never ordinary body/model input. `ragQuery()` forwards
+this identity to `/internal/v1/rag/query` without Authorization or ServiceKey.
+Server retains workspace/document ownership and transaction-level session
+checks. Missing identity does not fall back to a JWT or anonymous user.
 
-```http
-Authorization: Bearer <USER_JWT>
-X-Huahuo-Service-Key: <HUAHUO_AGENT_TO_SERVER_API_KEY>
-```
+`serviceRequest()` is for explicit system operations and does not manufacture
+a user session; user-scoped operations must use the trusted request context.
+Backend networking is unchanged by this implementation. Internal endpoints and
+production stored/editor management are excluded from public gateway routing.
 
-The user ID comes only from the verified JWT `sub` claim. Legacy user-id headers
-and Bearer-encoded service keys are not supported.
+## Studio
 
-Server-to-Agent internal routes, when registered under `/internal/`, additionally
-require `X-Huahuo-Service-Key: <HUAHUO_SERVER_TO_AGENT_API_KEY>`. APP-facing
-Agent routes do not require a service key.
+Set `HUAHUO_AGENT_PUBLIC_PATH=/agent` in Agent, Server and gateway. Set
+`HUAHUO_STUDIO_ORIGIN` to the external origin only (for example
+`https://api.example.com`, without `/agent`). Phone login is opt-in through
+`HUAHUO_STUDIO_AUTH_ENABLED=true` on both Agent and Server, development/test only.
 
-In local development (`APP_ENV=development`), Mastra Studio and its API routes
-are available without a user JWT. This only affects entry to the local Studio;
-the Service Key remains read from the Agent environment and is never supplied
-by the model or Studio. For a user-scoped RAG run, add the user's JWT to that
-run's RequestContext:
+Agent serves the login/legal UI and uses Server's existing login/SMS APIs. It
+writes HttpOnly/SameSite cookies using the token expiry returned by Server;
+it does not verify JWTs. Server ForwardAuth reads those cookies and performs
+refresh with single-instance concurrent-request deduplication. Studio is a test
+tool: reconnect/login again after a blue/green cutover if necessary; cross-instance
+refresh coordination is intentionally not implemented. Studio routes are absent
+on the main gateway branch. Gateway passes updated cookies
+back to the browser. Cookie Path is `/agent`; old `Path=/` cookies are cleared.
+Cookie requests keep same-origin checks. Public logout is routed directly to
+Server's auth adapter so expired credentials can still clear browser cookies.
 
-```json
-{ "huahuoUserJwt": "<USER_JWT>" }
-```
+Native Studio assets, router and refresh-events use `server.studioBase`. The
+application's `public-prefix.ts` middleware adapts only the served HTML runtime
+API-prefix configuration to `/agent/api` and detects incompatible templates.
+No Mastra source, package assets, or build outputs are patched. On upgrades run
+typecheck, tests (including installed-template and native ownership tests),
+build with Studio, and gateway smoke for login, HTML/assets/API and streaming.
 
-The RAG tool combines that per-run JWT with
-`HUAHUO_AGENT_TO_SERVER_API_KEY` from the environment. Production keeps
-`/api/*` protected by JWT, and the Server still requires the JWT on the RAG
-request to resolve the user's workspace.
+## Coordinated rollout
 
-`HuahuoServerClient.ragQuery()` is a user-scoped call. It reads the verified
-JWT from the current Mastra `RequestContext` and sends both credentials.
-`serviceRequest()` is for system calls and sends only the Agent→Server Service
-Key; the model and Tool input never choose this mode.
+This is an internal authentication contract change. Ship matching Server,
+Agent and gateway configurations together; do not deploy Agent alone against an
+old Server. Remove Agent `APP_JWT_*` and both directional `HUAHUO_*_API_KEY`
+settings. Server retains its JWT issuance/verification keys for ForwardAuth.
+Update the persisted gateway auth configuration using Server's documented
+`sync-auth-config` operation while retaining the selected API slot. Preserve
+existing application networking. This local change does not perform deployment.

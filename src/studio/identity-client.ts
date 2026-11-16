@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { resolveHuahuoServerBaseUrl } from '../server/base-url.js';
+import { trustedIdentityHeaders, type TrustedHuahuoIdentity } from '../auth/trusted-identity.js';
 
 export class StudioLoginError extends Error {
   constructor(readonly code: string, readonly status = 401) { super(code); }
@@ -8,6 +9,7 @@ export class StudioLoginError extends Error {
 const tokenSchema = z.object({
   accessToken: z.string().min(1),
   refreshToken: z.string().min(1),
+  accessTokenExpiresAt: z.string().datetime(),
 });
 const userSchema = z.object({ userId: z.string().uuid(), displayName: z.string(), phoneMasked: z.string() });
 const loginSchema = tokenSchema.extend({ user: userSchema });
@@ -26,12 +28,8 @@ export class StudioIdentityClient {
     return this.parse(loginSchema, await this.request('/api/v1/auth/login', input, requestId));
   }
 
-  async refresh(refreshToken: string): Promise<StudioTokens> {
-    return this.parse(tokenSchema, await this.request('/api/v1/auth/refresh', { refreshToken }));
-  }
-
-  async logout(accessToken: string): Promise<void> {
-    await this.request('/api/v1/auth/logout', undefined, undefined, accessToken);
+  async logout(identity: TrustedHuahuoIdentity): Promise<void> {
+    await this.request('/api/v1/auth/logout', undefined, undefined, identity);
   }
 
   private parse<T>(schema: z.ZodType<T>, data: unknown): T {
@@ -40,10 +38,10 @@ export class StudioIdentityClient {
     return result.data;
   }
 
-  private async request(path: string, body?: unknown, requestId?: string, accessToken?: string): Promise<unknown> {
+  private async request(path: string, body?: unknown, requestId?: string, identity?: TrustedHuahuoIdentity): Promise<unknown> {
     const headers: Record<string, string> = { 'content-type': 'application/json' };
     if (requestId) headers['x-idempotency-key'] = requestId;
-    if (accessToken) headers.authorization = `Bearer ${accessToken}`;
+    if (identity) Object.assign(headers, trustedIdentityHeaders(identity));
     let response: Response;
     try {
       // No automatic retry: sending SMS and rotating refresh tokens are stateful operations.

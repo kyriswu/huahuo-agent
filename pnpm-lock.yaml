@@ -23,9 +23,6 @@ importers:
       '@mastra/pg':
         specifier: 1.36.0
         version: 1.36.0(@mastra/core@1.83.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))
-      jose:
-        specifier: 6.1.0
-        version: 6.1.0
       pg:
         specifier: ^8.16.3
         version: 8.23.1
@@ -1624,9 +1621,6 @@ packages:
 
   isexe@2.0.0:
     resolution: {integrity: sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw==}
-
-  jose@6.1.0:
-    resolution: {integrity: sha512-TTQJyoEoKcC1lscpVDCSsVgYzUDg/0Bt3WE//WiTPK6uOCQC2KZS4MpugbMWt/zyjkopgZoXhZuCi00gLudfUA==}
 
   jose@6.2.13:
     resolution: {integrity: sha512-7TIg10ZE1x82YediN+lcrPNvGMKge9yFHQD+Qho/b8y2adfugU3AsvvHfxV0fzyFllT6l9xCjf4RWY9g/Z9PJQ==}
@@ -4126,8 +4120,6 @@ snapshots:
   isarray@1.0.0: {}
 
   isexe@2.0.0: {}
-
-  jose@6.1.0: {}
 
   jose@6.2.13: {}
 

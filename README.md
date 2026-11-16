@@ -55,8 +55,8 @@ Business clients can also read or update this memory using the existing
 authenticated native routes:
 
 ```http
-GET /api/memory/threads/{threadId}/working-memory?agentId=huox
-POST /api/memory/threads/{threadId}/working-memory?agentId=huox
+GET /agent/api/memory/threads/{threadId}/working-memory?agentId=huox
+POST /agent/api/memory/threads/{threadId}/working-memory?agentId=huox
 Authorization: Bearer <USER_JWT>
 Content-Type: application/json
 
@@ -67,7 +67,7 @@ The thread must exist and belong to the authenticated resource. The HTTP body
 uses a JSON **string**, unlike the model tool's `memory` object. HTTP merge
 requires a schema-based resource memory and an atomic-merge storage adapter;
 the configured PostgreSQL adapter supports it. Native routes do not treat a
-service key alone as a user identity. A future background/admin integration
+unscoped internal calls as a user identity. A future background/admin integration
 would need its own explicitly authorized identity mapping.
 The model's memory tool validates the configured schema. Direct native HTTP
 or programmatic memory writes do not enforce this business schema themselves;
@@ -323,12 +323,10 @@ database or LibSQL store is required. Save a draft to test changes, then publish
 activate the configuration. Keep `MASTRA_POSTGRES_PASSWORD` configured for persistent
 editing. Without configured storage, this project does not provide durable Editor state.
 
-Local development retains the existing Studio access policy. In production, `/api/stored/*`
-and `/api/editor/*` also require the trusted Server credential in `X-Huahuo-Service-Key`,
-in addition to the existing user JWT requirement. Ordinary APP JWTs cannot administer
-shared agents. Do not put the service key in browser configuration or request context;
-remote human administration needs an appropriately protected trusted deployment path.
-
+Test Studio uses gateway-authenticated user identity. On the main gateway branch,
+`/agent/api/stored/*` and `/agent/api/editor/*` are excluded from external routing;
+trusted internal management calls still require a user scope. Directional
+ServiceKeys are no longer used.
 This installs the standard Editor. Enterprise Agent Builder and model-powered Builder
 agents are not enabled. See the [official Editor guide](https://mastra.ai/docs/studio/editor).
 
@@ -402,32 +400,26 @@ APP_ENV=test MASTRA_POSTGRES_PASSWORD='' PORT=4112 node .mastra/output/index.mjs
 The built API exposes `/health`, `/api/agents`, and `/api/workflows` on that
 port. This check does not verify PostgreSQL persistence.
 
-For test Studio, set `HUAHUO_STUDIO_AUTH_ENABLED=true` with
-`APP_ENV=development` or `test`, then open `/studio-login`. Enter a phone
-number and SMS code using the existing Huahuo Server login. All phone numbers
-accepted by the Server can sign in. Successful login returns to the original
-Studio; there is no need to enter a JWT in Request Context.
+For test Studio, enable `HUAHUO_STUDIO_AUTH_ENABLED=true` on both Agent and
+Server with `APP_ENV=development` or `test`, then open `/agent/studio-login` on
+the gateway origin. The existing Server SMS/login APIs issue the tokens;
+Agent writes HttpOnly cookies without local JWT verification. ForwardAuth
+performs account/session checks and cookie refresh. Authenticated identity,
+not the token, flows to tools and native resource-scoped memory.
 
-The login adapter calls the Server's existing `/api/v1/auth/sms-code`,
-`/api/v1/auth/login`, `/api/v1/auth/refresh`, and `/api/v1/auth/logout` routes.
-It uses `clientType=web`, a persistent browser client ID, and the current
-agreement/privacy versions (`2026-08-20`, matching the App documents).
-If those versions change, set `HUAHUO_STUDIO_AGREEMENT_VERSION` and
-`HUAHUO_STUDIO_PRIVACY_VERSION` and update the copied documents in
-`src/studio/legal.ts`. The checkbox is unchecked by default.
+The login form retains `clientType=web`, a persistent browser client ID, and
+agreement/privacy versions (`2026-08-20`). Update
+`HUAHUO_STUDIO_AGREEMENT_VERSION`, `HUAHUO_STUDIO_PRIVACY_VERSION` and the copied
+legal documents together if the product agreements change. The consent
+checkbox is unchecked by default.
 
-Access and refresh tokens stay in HttpOnly cookies. Test middleware verifies
-the JWT, scopes memory to its user ID, and supplies the token to tools for
-Server requests. It refreshes expiring tokens automatically and deduplicates
-simultaneous refreshes on this single test instance. No Mastra or Studio
-package files are patched. The HuoX RAG tool continues to read its directional
-Service Key from `.env`; it is never entered in Studio. To switch accounts,
-open `/studio-login` and select **退出登录**.
-
-If a reverse proxy rewrites the public host, set `HUAHUO_STUDIO_ORIGIN` to
-the browser-facing origin (for example `https://agent-test.example.com`).
-Disable this test-only login adapter for production; production retains
-native JWT authentication on Agent API routes.
+Set `HUAHUO_STUDIO_ORIGIN` to the browser-facing origin without a path and
+`HUAHUO_AGENT_PUBLIC_PATH=/agent` consistently on both services and gateway.
+Logout is mapped to Server's cookie-aware auth adapter so an expired login can
+still clear cookies and revoke its session. Native Studio assets use the
+framework's subpath support; no package files are patched. See the
+[identity contract](src/server/README.md) for coordinated configuration and
+upgrade verification. Phone login remains disabled in production.
 
 ## Docker service
 
@@ -438,7 +430,7 @@ the example:
 cp .env.example .env
 ```
 
-The service configuration covers DeepSeek, the model gateway, Server/JWT credentials,
+The service configuration covers DeepSeek, the model gateway, Server address and trusted identity settings,
 Docker/Studio, and Mastra PostgreSQL/Memory. RAG parsing, chunking, embedding,
 and reranking belong to `huahuo-server`. The older standalone RAG scripts in
 this repository require explicit `RAG_*` configuration when invoked; those
@@ -463,12 +455,14 @@ If `HUAHUO_AGENT_TAG` is set in `.env`, build the image with that tag instead
 of `local`.
 
 The image includes Studio by default. Set `MASTRA_STUDIO_PATH=/app/studio`
-and `MASTRA_AUTO_DETECT_URL=true` in `.env`, then open `http://localhost:4111`.
-Studio uses the browser's address to reach the API, including when the host
-port differs from the container port. The API is at `http://localhost:4111/api`
-and the health check is at `http://localhost:4111/health`.
+and `HUAHUO_AGENT_PUBLIC_PATH=/agent` in `.env`, then open `/agent/` on the shared
+Traefik origin. Studio uses native `studioBase` for its pages and assets; a small
+application middleware sets its browser API prefix to `/agent/api`. Internal API
+routes remain `/api`; health remains `/health`. The installed Studio template is
+checked by `test/studio-prefix.test.ts` on Mastra upgrades.
 
-`APP_ENV` in `.env` controls application authentication. Test Studio uses
+All user APIs require trusted gateway identity in every environment.
+`APP_ENV` in `.env` controls whether the test phone-login UI can be enabled. Test Studio uses
 `development` or `test` with `HUAHUO_STUDIO_AUTH_ENABLED=true`; keep this local
 configuration bound to `127.0.0.1`. Production uses `APP_ENV=production`,
 `HUAHUO_STUDIO_AUTH_ENABLED=false`, and an API-only image. Compose defaults to
@@ -505,12 +499,11 @@ set these values in `.env` to join the existing Server network:
 
 ```dotenv
 HUAHUO_SERVER_BASE_URL=http://api-server:3000
-APP_JWT_JWKS_URL=http://api-server:3000/.well-known/jwks.json
 HUAHUO_AGENT_NETWORK=huahuo-server-dev_backend
 HUAHUO_AGENT_NETWORK_EXTERNAL=true
 ```
 
-For deployment on separate hosts, set the Server and JWKS URLs to the remote
+For deployment on separate hosts, set the Server URL to the internal
 Server address, `HUAHUO_AGENT_NETWORK=huahuo-agent_default`, and
 `HUAHUO_AGENT_NETWORK_EXTERNAL=false`. Compose then creates the Agent's own
 network. Set `AGENT_BIND_ADDRESS` to the required listening address and fill
@@ -539,3 +532,12 @@ workflow from protected `main`. main merges remain owner-controlled; production
 only prepares a release summary and retains the owner approval gate.
 See [team releases](docs/runbooks/team-releases.md) and the
 [standard release procedure](docs/runbooks/standard-release.md).
+
+## Unified identity and single-domain routing
+
+External requests authenticate through Server ForwardAuth at Traefik. Agent no
+longer verifies JWTs or uses directional ServiceKeys. User/session identity is
+passed in reserved headers and mapped to Mastra native resource ownership; model
+inputs cannot choose a different identity. Internal calls use the Server address
+directly. See [identity contract](src/server/README.md) for routing, coordinated
+configuration, Studio cookies, and upgrade checks.

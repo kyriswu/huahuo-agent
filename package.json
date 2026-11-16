@@ -22,7 +22,8 @@
     "rag:reconcile": "node --experimental-strip-types --env-file-if-exists=.env scripts/rag-reconcile.ts",
     "rag:acceptance:dense:mock": "node --experimental-strip-types --env-file-if-exists=.env scripts/rag-acceptance-dense.ts",
     "release:check": "node scripts/release/release-plan.mjs",
-    "release:smoke": "node scripts/release/smoke.mjs"
+    "release:smoke": "node scripts/release/smoke.mjs",
+    "test:studio:built": "node scripts/studio-smoke.mjs"
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "2.0.85",
@@ -30,7 +31,6 @@
     "@mastra/editor": "0.17.1",
     "@mastra/memory": "1.41.1",
     "@mastra/pg": "1.36.0",
-    "jose": "6.1.0",
     "pg": "^8.16.3",
     "zod": "^3.25.76"
   },

@@ -44,5 +44,7 @@ jobs:
         run: pnpm test
       - name: Build API and Studio
         run: pnpm build --studio
+      - name: Verify built Studio subpath and native authentication
+        run: pnpm test:studio:built
       - name: Deterministic RAG acceptance
         run: pnpm rag:acceptance:dense:mock

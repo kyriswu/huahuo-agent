@@ -2,6 +2,9 @@ import { Agent } from '@mastra/core/agent';
 import { Mastra } from '@mastra/core/mastra';
 import { InMemoryStore } from '@mastra/core/storage';
 import { MastraEditor } from '@mastra/editor';
+import { RequestContext } from '@mastra/core/request-context';
+import { huahuoAuthMiddleware } from '../src/auth/mastra-auth.js';
+import { readTrustedIdentity, trustedIdentityHeaders } from '../src/auth/trusted-identity.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
@@ -33,35 +36,41 @@ describe('Mastra Editor', () => {
   });
 });
 
-describe('Editor management service authentication', () => {
-  async function invoke(environment: string, path: string, key?: string) {
+describe('Editor management trusted identity', () => {
+  async function invoke(environment: string, path: string, headers: HeadersInit = {}) {
     vi.stubEnv('APP_ENV', environment);
-    vi.stubEnv('HUAHUO_SERVER_BASE_URL', 'https://server.example.test');
-    vi.stubEnv('HUAHUO_SERVER_TO_AGENT_API_KEY', 'editor-test-service-key');
-    vi.resetModules();
-    const { huahuoServiceAuthMiddleware } = await import('../src/auth/mastra-auth.ts');
     const next = vi.fn(async () => undefined);
-    const handler = typeof huahuoServiceAuthMiddleware === 'function' ? huahuoServiceAuthMiddleware : huahuoServiceAuthMiddleware.handler;
-    const context = { req: { path, header: (name: string) => name.toLowerCase() === 'x-huahuo-service-key' ? key : undefined } } as unknown as Parameters<typeof handler>[0];
+    const handler = typeof huahuoAuthMiddleware === 'function' ? huahuoAuthMiddleware : huahuoAuthMiddleware.handler;
+    const context = {
+      req: { path, raw: new Request(`http://agent.test${path}`, { headers }) },
+      get: () => new RequestContext(),
+    } as unknown as Parameters<typeof handler>[0];
     const response = await handler(context, next);
     return { response: response as Response | undefined, next };
   }
-  it.each(['/api/stored/agents', '/api/stored/agents/huox/versions', '/api/stored/prompt-blocks', '/api/editor/builder/settings', '/api/%73tored/agents'])('rejects a production management request without the service credential: %s', async path => {
+  const identity = readTrustedIdentity({
+    'x-huahuo-user-id': 'a0000000-0000-4000-8000-000000000001',
+    'x-huahuo-session-id': 'b0000000-0000-4000-8000-000000000002',
+    'x-huahuo-auth-method': 'bearer',
+  });
+
+  it.each(['/api/stored/agents', '/api/stored/agents/huox/versions', '/api/stored/prompt-blocks', '/api/editor/builder/settings', '/api/%73tored/agents'])('requires trusted identity on management requests: %s', async path => {
     const result = await invoke('production', path);
     expect(result.response?.status).toBe(401); expect(result.next).not.toHaveBeenCalled();
   });
-  it('rejects an incorrect key and accepts the configured service credential', async () => {
-    expect((await invoke('production', '/api/stored/agents', 'wrong')).response?.status).toBe(401);
-    const result = await invoke('production', '/api/stored/agents', 'editor-test-service-key');
+  it('accepts an internal trusted caller without a ServiceKey', async () => {
+    // The gateway keeps production management routes off the external router.
+    const result = await invoke('production', '/api/stored/agents', trustedIdentityHeaders(identity));
     expect(result.next).toHaveBeenCalledOnce(); expect(result.response).toBeUndefined();
   });
-  it('keeps local Studio available without a service credential', async () => {
-    const result = await invoke('development', '/api/stored/agents'); expect(result.next).toHaveBeenCalledOnce();
+  it.each(['test', 'development'])('requires identity for local Studio management in %s', async environment => {
+    expect((await invoke(environment, '/api/stored/agents')).response?.status).toBe(401);
+    expect((await invoke(environment, '/api/stored/agents', trustedIdentityHeaders(identity))).next).toHaveBeenCalledOnce();
   });
-  it('leaves ordinary user Agent endpoints on their existing JWT authentication path', async () => {
-    const result = await invoke('production', '/api/agents/huox/stream'); expect(result.next).toHaveBeenCalledOnce();
-  });
-  it('still requires service credentials on internal endpoints during development', async () => {
-    expect((await invoke('development', '/internal/v1/status')).response?.status).toBe(401);
+  it('requires the same user context for ordinary and internal Agent requests', async () => {
+    for (const path of ['/api/agents/huox/stream', '/internal/v1/status']) {
+      expect((await invoke('development', path)).response?.status).toBe(401);
+      expect((await invoke('development', path, trustedIdentityHeaders(identity))).next).toHaveBeenCalledOnce();
+    }
   });
 });

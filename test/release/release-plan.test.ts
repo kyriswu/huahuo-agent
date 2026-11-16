@@ -6,7 +6,8 @@ import { validateReleasePlan } from '../../scripts/release/release-plan.mjs';
 const plan = () => JSON.parse(readFileSync(new URL('../../scripts/release/plan.json', import.meta.url), 'utf8'));
 describe('Agent release plan', () => {
   it('records an uninitialized deployment separately from a Git head', () => {
-    expect(validateReleasePlan(plan()).baseRevision).toBeNull();
+    const initial = plan(); initial.baseRevision = null;
+    expect(validateReleasePlan(initial).baseRevision).toBeNull();
     const next = plan(); next.baseRevision = 'a'.repeat(40);
     expect(validateReleasePlan(next).baseRevision).toBe(next.baseRevision);
   });
