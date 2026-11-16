@@ -9,8 +9,10 @@ import { chatgptOpenAIGateway } from './gateways/chatgpt-openai-gateway.ts';
 import { weatherWorkflow } from './workflows/weather-workflow.ts';
 import { huahuoRagQueryTool } from './tools/huahuo-rag-query-tool.ts';
 import { weatherTool } from './tools/weather-tool.ts';
+import { deepseekWebTools } from './tools/mcp/index.ts';
 import { huahuoApiAuthRequired, huahuoAuth, huahuoAuthMiddleware, huahuoServiceAuthMiddleware } from '../auth/mastra-auth.ts';
 import { validateAgentServiceAuthConfig } from '../auth/service-key.ts';
+import { createStudioGateway } from '../studio/gateway.ts';
 
 validateAgentServiceAuthConfig();
 
@@ -32,16 +34,19 @@ function createPostgresStorage() {
 }
 
 const storage = createPostgresStorage();
+const studioGateway = createStudioGateway();
 
 export const mastra = new Mastra({
   ...(storage ? { storage } : {}),
   editor: new MastraEditor(),
   server: {
+    mcp: { enabled: false },
     ...(huahuoApiAuthRequired ? { auth: huahuoAuth } : {}),
-    middleware: [huahuoServiceAuthMiddleware, huahuoAuthMiddleware],
+    apiRoutes: studioGateway.routes,
+    middleware: [...(studioGateway.enabled ? [studioGateway.middleware] : []), huahuoServiceAuthMiddleware, huahuoAuthMiddleware],
   },
   agents: { huoxAgent, weatherAgent },
-  tools: { huahuoRagQueryTool, weatherTool },
+  tools: { huahuoRagQueryTool, weatherTool, ...deepseekWebTools },
   gateways: { chatgptOpenAI: chatgptOpenAIGateway },
   workflows: { weatherWorkflow },
 });

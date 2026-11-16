@@ -56,6 +56,7 @@ describe('Mastra runtime compatibility', () => {
     const modelBaseUrl = 'http://127.0.0.1:44111/v1';
     const serverBaseUrl = 'http://127.0.0.1:44112';
     vi.stubEnv('APP_ENV', 'test');
+    vi.stubEnv('MODEL_PROVIDER', 'cliproxy');
     vi.stubEnv('CLIPROXY_BASE_URL', modelBaseUrl);
     vi.stubEnv('CLIPROXY_API_KEY', 'local-model-key');
     vi.stubEnv('CLIPROXY_MODEL', 'local-runtime-model');
@@ -148,6 +149,79 @@ describe('Mastra runtime compatibility', () => {
       expect(JSON.stringify(modelRequests[2].body.messages)).toContain(firstPrompt);
       expect(JSON.stringify(modelRequests[2].body.messages)).toContain(answer);
       expect(ragRequests).toHaveLength(1);
+    } finally {
+      await mastra.shutdown();
+    }
+  }, 20_000);
+
+  it('runs HuoX through Search, Fetch, and a final answer across a complete tool-call loop', async () => {
+    const modelBaseUrl = 'http://127.0.0.1:44111/v1';
+    vi.stubEnv('APP_ENV', 'test');
+    vi.stubEnv('MODEL_PROVIDER', 'cliproxy');
+    vi.stubEnv('CLIPROXY_BASE_URL', modelBaseUrl);
+    vi.stubEnv('CLIPROXY_API_KEY', 'local-model-key');
+    vi.stubEnv('CLIPROXY_MODEL', 'local-runtime-model');
+    vi.stubEnv('DEEPSEEK_API_KEY', 'local-web-key');
+    vi.stubEnv('MASTRA_MEMORY_GENERATE_TITLE', 'false');
+    const modelRequests: ChatRequest[] = [];
+    const webRequests: Array<{ url: string; body: unknown; authorization: string | null }> = [];
+    const sourceUrl = 'https://example.org/source';
+    const page = { title: 'Web evidence', content: '# Evidence\n\nSearch and Fetch can be reused by project agents.' };
+
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const request = new Request(input, init);
+      if (request.url === `${modelBaseUrl}/chat/completions`) {
+        const body = await request.json() as ChatRequest;
+        modelRequests.push(body);
+        const toolMessages = body.messages.filter(message => message.role === 'tool');
+        if (toolMessages.length >= 2) return chatResponse(body, { role: 'assistant', content: `The evidence is at ${sourceUrl}.` }, 'stop');
+        const search = toolMessages.length === 0;
+        return chatResponse(body, {
+          role: 'assistant', content: null,
+          tool_calls: [{
+            id: search ? 'search-call' : 'fetch-call', type: 'function',
+            function: {
+              name: search ? 'onlineSearch' : 'urlFetch',
+              arguments: JSON.stringify(search ? { query: 'Reusable Mastra tools', count: 1 } : { url: sourceUrl }),
+            },
+          }],
+        }, 'tool_calls');
+      }
+      if (request.url.startsWith('https://api.deepseek.com/v1/tools/')) {
+        webRequests.push({ url: request.url, body: await request.json(), authorization: request.headers.get('authorization') });
+        return request.url.endsWith('/fetch') ? Response.json(page) : Response.json({ results: [{
+          rerank_score: 2.8, title: page.title, url: sourceUrl, snippet: 'Reusable tools', summary: 'Read this source.',
+          content: '', site_name: 'Example', site_icon: null, date: null, authority: 3,
+        }] });
+      }
+      throw new Error(`Unexpected outbound request in web-tool regression: ${request.url}`);
+    }));
+
+    const { huoxAgent } = await import('../src/mastra/agents/huox.ts');
+    const { chatgptOpenAIGateway } = await import('../src/mastra/gateways/chatgpt-openai-gateway.ts');
+    const mastra = new Mastra({
+      agents: { huoxAgent },
+      gateways: { chatgptOpenAI: chatgptOpenAIGateway },
+      storage: new InMemoryStore({ id: 'huox-web-regression' }),
+      logger: false,
+    });
+    try {
+      const result = await huoxAgent.generate('Find and read evidence.', {
+        memory: { thread: 'web-thread', resource: 'web-user' },
+        maxSteps: 3,
+        modelSettings: { maxRetries: 0 },
+      });
+      expect(result.text).toContain(sourceUrl);
+      expect(modelRequests).toHaveLength(3);
+      expect(modelRequests[0].tools?.map(tool => tool.function.name)).toEqual(expect.arrayContaining([
+        'huahuoRagQueryTool', 'onlineSearch', 'urlFetch',
+      ]));
+      expect(JSON.stringify(modelRequests[2].messages)).toContain('Search and Fetch can be reused');
+      expect(webRequests).toEqual([
+        { url: 'https://api.deepseek.com/v1/tools/search', body: { query: 'Reusable Mastra tools', count: 1, localization: '', need_content: false }, authorization: 'Bearer local-web-key' },
+        { url: 'https://api.deepseek.com/v1/tools/fetch', body: { url: sourceUrl }, authorization: 'Bearer local-web-key' },
+      ]);
+      expect(Object.keys(mastra.listMCPServers() ?? {})).toEqual([]);
     } finally {
       await mastra.shutdown();
     }

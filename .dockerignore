@@ -6,6 +6,13 @@
 !tsconfig.json
 !src/
 !src/**
+!skills/
+!skills/**
+!scripts/
+!scripts/release/
+!scripts/release/smoke.mjs
+!scripts/release/changes/
+!scripts/release/changes/**
 
 **/.env
 **/.env.*

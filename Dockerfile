@@ -12,6 +12,9 @@ RUN pnpm install --frozen-lockfile
 
 COPY tsconfig.json ./
 COPY src ./src
+COPY skills ./skills
+COPY scripts/release/smoke.mjs ./release/smoke.mjs
+COPY scripts/release/changes ./release/changes
 ARG MASTRA_BUILD_STUDIO=true
 RUN export NODE_OPTIONS=--max-old-space-size=768 \
     npm_config_network_concurrency=4 \
@@ -34,6 +37,8 @@ ENV NODE_ENV=production \
     MASTRA_TELEMETRY_DISABLED=1
 
 COPY --from=build --chown=node:node /app/.mastra/output/ ./
+COPY --from=build --chown=node:node /app/skills/ ./skills/
+COPY --from=build --chown=node:node /app/release/ ./release/
 
 USER node
 EXPOSE 4111

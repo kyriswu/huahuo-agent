@@ -1,0 +1,4 @@
+# Only release-skill changes require kyriswu review.
+# No wildcard ownership: other skills and business files stay unchanged.
+/.agents/skills/huahuo-release/ @kyriswu
+/.github/CODEOWNERS @kyriswu

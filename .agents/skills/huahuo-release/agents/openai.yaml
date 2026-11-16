@@ -1,0 +1,4 @@
+interface:
+  display_name: "花火 Agent 发布"
+  short_description: "准备 Agent 测试发布、核对配置与 Mastra 存储兼容并记录真实验收证据"
+  default_prompt: "使用 $huahuo-release 为当前花火 Agent 改动准备发布清单、验证并按已有授权推进发布。"

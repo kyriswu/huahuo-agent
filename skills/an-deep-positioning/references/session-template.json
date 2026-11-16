@@ -1,0 +1,76 @@
+{
+  "positioningConsultation": {
+    "mode": "deep",
+    "simplePhase": null,
+    "currentSubjectId": "audience_facts",
+    "currentSubject": "目标用户基础画像",
+    "subjectGoal": "决定当前最值得先理解的一个具体人是谁",
+    "subjectStatus": "exploring",
+    "subjectRound": 0,
+    "dryReplyCount": 0,
+    "recommendedNextSubjectId": "audience_insight",
+    "recommendedNextSubject": "典型用户深度洞察",
+    "userDecision": null,
+    "resumePoint": "audience_facts",
+    "completedSubjectIds": [],
+    "completedSubjects": [],
+    "dependencies": [],
+    "confirmedMaterial": [],
+    "expertJudgment": "",
+    "consequentialGaps": [],
+    "positioningBoundaries": [],
+    "positioningHypotheses": null,
+    "recovery": {
+      "mode": null,
+      "enteredAtSubjectId": null,
+      "reason": null,
+      "returnSubjectId": null
+    },
+    "subjectAssets": {
+      "audience": {
+        "core": "",
+        "seed": "",
+        "trigger": "",
+        "conflict": "",
+        "language": []
+      },
+      "creator": {
+        "valueSources": [],
+        "durableSupports": [],
+        "visibleResources": [],
+        "limits": []
+      },
+      "value": {
+        "hierarchy": [],
+        "perceived": [],
+        "leadingTerritory": "",
+        "vertical": ""
+      },
+      "account": {
+        "primaryType": "",
+        "supportingTypes": [],
+        "boundaries": []
+      },
+      "competition": {
+        "leadingPath": "",
+        "alternative": "",
+        "informationBasis": [],
+        "tradeoff": ""
+      },
+      "delivery": {
+        "primaryMode": "",
+        "supportingModes": [],
+        "form": "",
+        "boundaries": []
+      },
+      "persona": {
+        "relationship": "",
+        "tone": "",
+        "stance": "",
+        "disclosure": "",
+        "signatures": []
+      }
+    },
+    "needsReviewSubjectIds": []
+  }
+}

@@ -12,17 +12,17 @@ importers:
         specifier: 2.0.85
         version: 2.0.85(zod@3.25.76)
       '@mastra/core':
-        specifier: 1.82.0
-        version: 1.82.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76)
+        specifier: 1.83.0
+        version: 1.83.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76)
       '@mastra/editor':
-        specifier: 0.17.0
-        version: 0.17.0(@mastra/core@1.82.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))(ws@8.22.0)(zod@3.25.76)
+        specifier: 0.17.1
+        version: 0.17.1(@mastra/core@1.83.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))(ws@8.22.0)(zod@3.25.76)
       '@mastra/memory':
-        specifier: 1.41.0
-        version: 1.41.0(@mastra/core@1.82.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))
+        specifier: 1.41.1
+        version: 1.41.1(@mastra/core@1.83.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))
       '@mastra/pg':
-        specifier: 1.35.0
-        version: 1.35.0(@mastra/core@1.82.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))
+        specifier: 1.36.0
+        version: 1.36.0(@mastra/core@1.83.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))
       jose:
         specifier: 6.1.0
         version: 6.1.0
@@ -33,6 +33,12 @@ importers:
         specifier: ^3.25.76
         version: 3.25.76
     devDependencies:
+      '@alicloud/openapi-core':
+        specifier: 1.0.9
+        version: 1.0.9
+      '@darabonba/typescript':
+        specifier: 1.0.6
+        version: 1.0.6
       '@types/node':
         specifier: ^26.6.6
         version: 26.6.6
@@ -40,8 +46,8 @@ importers:
         specifier: ^8.15.5
         version: 8.23.1
       mastra:
-        specifier: 1.38.0
-        version: 1.38.0(@hono/node-server@1.19.17(hono@4.13.14))(@mastra/core@1.82.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))(@opentelemetry/api@1.10.0)(zod@3.25.76)
+        specifier: 1.39.0
+        version: 1.39.0(@hono/node-server@1.19.17(hono@4.13.14))(@mastra/core@1.83.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))(@opentelemetry/api@1.10.0)(zod@3.25.76)
       typescript:
         specifier: ^5.9.2
         version: 5.9.3
@@ -116,6 +122,48 @@ packages:
   '@ai-sdk/provider@4.0.35':
     resolution: {integrity: sha512-yBz6fmLS8MSCIzy7NiHEUAq56ZLD4ZA1GR6bpXBxgbwUacP1La7LuwAr/xy9jSzthem4F8Xu2OrhvU/JrE9fYA==}
     engines: {node: '>=22'}
+
+  '@alicloud/credentials@2.4.7':
+    resolution: {integrity: sha512-pVeLM4Mjdh2PSs+h36CDBOCsvXyZTBG3tgT7chzH8jqWgVGU4UIgYw2h76ZviBpqADFPs3QReYg2AX/gzmqwOw==}
+
+  '@alicloud/darabonba-array@0.1.2':
+    resolution: {integrity: sha512-ZPuQ+bJyjrd8XVVm55kl+ypk7OQoi1ZH/DiToaAEQaGvgEjrTcvQkg71//vUX/6cvbLIF5piQDvhrLb+lUEIPQ==}
+
+  '@alicloud/darabonba-encode-util@0.0.1':
+    resolution: {integrity: sha512-Sl5vCRVAYMqwmvXpJLM9hYoCHOMsQlGxaWSGhGWulpKk/NaUBArtoO1B0yHruJf1C5uHhEJIaylYcM48icFHgw==}
+
+  '@alicloud/darabonba-encode-util@0.0.2':
+    resolution: {integrity: sha512-mlsNctkeqmR0RtgE1Rngyeadi5snLOAHBCWEtYf68d7tyKskosXDTNeZ6VCD/UfrUu4N51ItO8zlpfXiOgeg3A==}
+
+  '@alicloud/darabonba-map@0.0.1':
+    resolution: {integrity: sha512-2ep+G3YDvuI+dRYVlmER1LVUQDhf9kEItmVB/bbEu1pgKzelcocCwAc79XZQjTcQGFgjDycf3vH87WLDGLFMlw==}
+
+  '@alicloud/darabonba-signature-util@0.0.4':
+    resolution: {integrity: sha512-I1TtwtAnzLamgqnAaOkN0IGjwkiti//0a7/auyVThdqiC/3kyafSAn6znysWOmzub4mrzac2WiqblZKFcN5NWg==}
+
+  '@alicloud/darabonba-string@1.0.3':
+    resolution: {integrity: sha512-NyWwrU8cAIesWk3uHL1Q7pTDTqLkCI/0PmJXC4/4A0MFNAZ9Ouq0iFBsRqvfyUujSSM+WhYLuTfakQXiVLkTMA==}
+
+  '@alicloud/endpoint-util@0.0.1':
+    resolution: {integrity: sha512-+pH7/KEXup84cHzIL6UJAaPqETvln4yXlD9JzlrqioyCSaWxbug5FUobsiI6fuUOpw5WwoB3fWAtGbFnJ1K3Yg==}
+
+  '@alicloud/gateway-pop@0.0.6':
+    resolution: {integrity: sha512-KF4I+JvfYuLKc3fWeWYIZ7lOVJ9jRW0sQXdXidZn1DKZ978ncfGf7i0LBfONGk4OxvNb/HD3/0yYhkgZgPbKtA==}
+
+  '@alicloud/gateway-spi@0.0.8':
+    resolution: {integrity: sha512-KM7fu5asjxZPmrz9sJGHJeSU+cNQNOxW+SFmgmAIrITui5hXL2LB+KNRuzWmlwPjnuA2X3/keq9h6++S9jcV5g==}
+
+  '@alicloud/openapi-core@1.0.9':
+    resolution: {integrity: sha512-2RE4cOR5B8p0Q3LyRR13flj/vab+oOGg/uOCrhln/MIsSnbU6KkAnaYqVNZgTF+liDyxE/Bk/EkBVt8BMv1E5g==}
+
+  '@alicloud/openapi-util@0.3.3':
+    resolution: {integrity: sha512-vf0cQ/q8R2U7ZO88X5hDiu1yV3t/WexRj+YycWxRutkH/xVXfkmpRgps8lmNEk7Ar+0xnY8+daN2T+2OyB9F4A==}
+
+  '@alicloud/tea-typescript@1.8.0':
+    resolution: {integrity: sha512-CWXWaquauJf0sW30mgJRVu9aaXyBth5uMBCUc+5vKTK1zlgf3hIqRUjJZbjlwHwQ5y9anwcu18r48nOZb7l2QQ==}
+
+  '@alicloud/tea-util@1.4.11':
+    resolution: {integrity: sha512-HyPEEQ8F0WoZegiCp7sVdrdm6eBOB+GCvGl4182u69LDFktxfirGLcAx3WExUr1zFWkq2OSmBroTwKQ4w/+Yww==}
 
   '@arcadeai/arcadejs@2.4.1':
     resolution: {integrity: sha512-DLpvvDBvRNjzVmFYJ+upPrUJ8YRBoGWqPfzhuFp2+lh5Shxm0l9qLwe1Ah4pKvuCatU7TLOOTkFpICitTuuJeQ==}
@@ -283,6 +331,9 @@ packages:
       '@composio/core': '>=0.10.0 <1.0.0 || >=1.0.0-beta.0 <1.0.0'
       '@mastra/core': ^1.46.0
       zod: ^3.25 || ^4
+
+  '@darabonba/typescript@1.0.6':
+    resolution: {integrity: sha512-/cYhcDquFhNo7VIeC4DgV+vSbJcF67oGnMS0EdOg+2mB8GSUNhZ5YUN5a1NrzeBiQEFMwQ164vVVn0vmgDkggA==}
 
   '@esbuild/aix-ppc64@0.28.2':
     resolution: {integrity: sha512-XExcO+dvLKvVtNTibSTBej1NCAbaGhWn9Ww1ZPx80qsahhPFe/8jgWP0IchNe0F3HwkU7n8ejhH8bjonqht8mQ==}
@@ -502,23 +553,27 @@ packages:
     resolution: {integrity: sha512-qC72D4+CDdjGqJvkFMMEAtancHUQ7/d/tAiHf64z8MopFDmcrtbcJuerDtFceuAfQJ2pDSfCKCtbqoGBNnwg0w==}
     engines: {node: '>=8'}
 
-  '@mastra/core@1.82.0':
-    resolution: {integrity: sha512-jrgFcoSYAVSsE41fXD3dUxuRWZtfFc3HuGRQRnQmGDHYQMU/S89YoP/ZilkSM3c9nn0Gxj9qFVzauoNZONPIxw==}
+  '@mastra/core@1.83.0':
+    resolution: {integrity: sha512-dlwmVDN6duLn7WSTEzrPzUIsgQ3OL6ZezNKs0JPuBKwQpwJsAHb2sdB6MiDxA/H/8sc9BN8IVwfvn41TPZb8IA==}
     engines: {node: '>=22.13.0'}
     peerDependencies:
+      '@json-render/chat': ^0.22.0
       zod: ^3.25.0 || ^4.0.0
+    peerDependenciesMeta:
+      '@json-render/chat':
+        optional: true
 
-  '@mastra/deployer@1.82.0':
-    resolution: {integrity: sha512-lyyN8HFBUDM1Bb61AC1QtCMTT7ECC2CWPTVZDZl9BNtW1EP6Teqz0xlecWyLrapwLI5UWBVdB6XnXzHLNODL7Q==}
+  '@mastra/deployer@1.83.0':
+    resolution: {integrity: sha512-ZWkW293DykpvAezLkGERSC9b+fOy9Hc1mHGlUTZr652cQJuUwA9Xl9Li2H9alETUeUkLI/qRZn6nz6ZkjCk2ow==}
     engines: {node: '>=22.13.0'}
     peerDependencies:
-      '@mastra/core': '>=1.81.0-0 <2.0.0-0'
+      '@mastra/core': '>=1.83.0-0 <2.0.0-0'
 
-  '@mastra/editor@0.17.0':
-    resolution: {integrity: sha512-h5/3fcV7Q1IM4J4kj7YD4wMkw/R9YcWHsOddvilEgTO6n3DqZ0j/rObLorolFJlDBvltSbZExAJoKoOIxpeKzw==}
+  '@mastra/editor@0.17.1':
+    resolution: {integrity: sha512-VHDERrxIRcNJ1BT3vmTbWad4VEXMPND5B7Xn7G8rUNYhMhs68uZNRyUNl5M4l9WZQ4Uv7CiZYWuAkEQzmZFGrA==}
     engines: {node: '>=22.13.0'}
     peerDependencies:
-      '@mastra/core': '>=1.80.0-0 <2.0.0-0'
+      '@mastra/core': '>=1.83.0-0 <2.0.0-0'
       '@mastra/mcp': '>=1.0.0-0 <3.0.0-0'
     peerDependenciesMeta:
       '@mastra/mcp':
@@ -530,30 +585,34 @@ packages:
     peerDependencies:
       '@mastra/core': '>=1.0.0-0 <2.0.0-0'
 
-  '@mastra/memory@1.41.0':
-    resolution: {integrity: sha512-g8SdfS88TdjdM9Yl3kzE+NB6iXnCavoZ7zrv8uFEBNcsVWJBQ6yBU6fknxRsnr7q9D9VnSU9D5oFAIGqfq3VvQ==}
+  '@mastra/memory@1.41.1':
+    resolution: {integrity: sha512-HHuoYk/I+t4IbEujFHZ6AgqSdkqwypZ8rTVTa331TKbxH4F42GscLlu0+8ancU0zr2S7R/1Iu7Qo0ZSn68DHNg==}
     engines: {node: '>=22.13.0'}
     peerDependencies:
-      '@mastra/core': '>=1.80.0-0 <2.0.0-0'
+      '@mastra/core': '>=1.83.0-0 <2.0.0-0'
 
-  '@mastra/pg@1.35.0':
-    resolution: {integrity: sha512-cRHNs0x1Q7fca2i9oZyfftfYXu5gic2sZ8uAKEQfUqXH4eQteR9yPxjjmZwieZ8JpfQHRSoIj/I1HfNp2xhUcQ==}
+  '@mastra/pg@1.36.0':
+    resolution: {integrity: sha512-NynOutu7x3C7EQ9XpBFeqUteqX13DlBm2j+lSQ6xQ2DALIj6VS/yDl9mGanr1c3qB+1qU6/kYdXp3BRKoFJAhQ==}
     engines: {node: '>=22.13.0'}
     peerDependencies:
-      '@mastra/core': '>=1.80.0-0 <2.0.0-0'
+      '@mastra/core': '>=1.83.0-0 <2.0.0-0'
 
-  '@mastra/schema-compat@1.3.17':
-    resolution: {integrity: sha512-8tuRZkVL7JE5A7pH2/GV3khYM+R8xHa+WPSjykq4OjKT2O4s9mNpPl8174dEN8TZUYetUAtxZM0HVM24ON0UQg==}
+  '@mastra/schema-compat@1.4.0':
+    resolution: {integrity: sha512-td/x/hfCxY1/3w44FNMNv/qQ/ydNke5tFIP1FLxqGtO33wwtfDR801dQwSSLa8MA3z02D9RkNTb2ynLWuqX88A==}
     engines: {node: '>=22.13.0'}
     peerDependencies:
       zod: ^3.25.0 || ^4.0.0
 
-  '@mastra/server@1.82.0':
-    resolution: {integrity: sha512-ty0LDcIq+nv7wsfXzVui6OeSJ0ECbibT5IEIjwe7i6/70U2l7IgqCS532P4+dIGOgMGPHkzZ3Skj7Nqw/2heYQ==}
+  '@mastra/server@1.83.0':
+    resolution: {integrity: sha512-avwAY4cUc7scQU015aLFRAFHaHmIv/id2aTxP4Y/Hyj5uPRbvIQk+zVo5XrVNSUH4ThyE6HTkb/+EwmiH8WVfA==}
     engines: {node: '>=22.13.0'}
     peerDependencies:
-      '@mastra/core': '>=1.80.0-0 <2.0.0-0'
+      '@mastra/core': '>=1.83.0-0 <2.0.0-0'
+      '@mastra/mcp': '>=2.9.0-alpha.3 <3.0.0-0'
       zod: ^3.25.0 || ^4.0.0
+    peerDependenciesMeta:
+      '@mastra/mcp':
+        optional: true
 
   '@napi-rs/lzma-linux-x64-gnu@1.5.1':
     resolution: {integrity: sha512-oTXEIha4SsuXdTA4Iyskj0kpdx2yVXdhd75c2v3xGrHFfVMsbhTPZU/nMPL4sWKo4pBHm3aucLaqGlF696dTyQ==}
@@ -580,6 +639,34 @@ packages:
 
   '@pinojs/redact@0.4.0':
     resolution: {integrity: sha512-k2ENnmBugE/rzQfEcdWHcCY+/FM3VLzH9cYEsbdsoqrvzAKRhUZeRNhAZvB8OitQJ1TBed3yqWtdjzS6wJKBwg==}
+
+  '@pnpm/catalogs.protocol-parser@1100.0.1':
+    resolution: {integrity: sha512-82j4rrUAE/zDgaw5xgR1jj3AGTtoxUY7KKEwel4AUGiJpPUcdtCGGUUbOyMCQebgSlSaZZE/hNTbkqACNIepgA==}
+    engines: {node: '>=22.13'}
+
+  '@pnpm/catalogs.resolver@1100.1.2':
+    resolution: {integrity: sha512-qKUZMTbARCqLUJl/LDA7s5zy/Aac1UjgSucDplF1WVGT2rT44SVICL5uFnmmRMtSlcdD3MYH0L9qqamkkx0YDQ==}
+    engines: {node: '>=22.13'}
+
+  '@pnpm/catalogs.types@1100.0.1':
+    resolution: {integrity: sha512-G5ZtOTwqHmZjEAiGcYu1F6njmX0AGFnh9p7KeKJyVR/bJRSJgYZM2ImRPsH+HhzTZBX7oHnMI/RXbv9vT0hohA==}
+    engines: {node: '>=22.13'}
+
+  '@pnpm/config.parse-overrides@1100.1.8':
+    resolution: {integrity: sha512-0P4VUj4gfhg0rRXB3fFtMOpVMbzUc7xCNoO3owDKIEX10JgJsHCN1/b7z4Y3wUt7wiHnEy8s8alNOHrgTMAaiw==}
+    engines: {node: '>=22.13'}
+
+  '@pnpm/constants@1102.0.1':
+    resolution: {integrity: sha512-vLulGZ3iRt6kHcwbGYckrUF2Rd18nfGtpFjyRgbKmEyxLcZmFTBOWKFZSEyS3VVnxFEI7bTPNOGmRC0lD4U1qg==}
+    engines: {node: '>=22.13'}
+
+  '@pnpm/error@1100.2.2':
+    resolution: {integrity: sha512-OVUBUOtFou4xLyrnoETrplOX1FszsAVSfiq/H0DaN+g4nvqOlLPe12pLCoR2/P2Va9yEsInjgsXyrY29Ujgi7g==}
+    engines: {node: '>=22.13'}
+
+  '@pnpm/resolving.parse-wanted-dependency@1100.0.3':
+    resolution: {integrity: sha512-3fhvdnSFTcLGgaVIISc+269N4j2ugpUsiRErdT+M2vyOc0b3Vgs2mvSPdFyq2insCL4vFLiHOZxg7SddSFjMTQ==}
+    engines: {node: '>=22.13'}
 
   '@posthog/core@1.61.2':
     resolution: {integrity: sha512-l3b6Dc2NmItwmyu6ot7K2jtStQOAQjZw/PB/gpZwk2W6SBCbvPg6YJzReSBSQLuok19ridbfVNk70a5hgoGX2Q==}
@@ -1000,6 +1087,15 @@ packages:
   '@types/ms@2.1.0':
     resolution: {integrity: sha512-GsCCIZDE/p3i96vtEqx+7dBUGXrc7zeSK3wwPHIaRThS+9OhWIXRqzs4d6k1SVU8g91DrNRWxWUGhp5KXQb2VA==}
 
+  '@types/node@12.20.55':
+    resolution: {integrity: sha512-J8xLz7q2OFulZ2cyGTLE1TbbZcjpno7FaN6zdJNrgAdrJ+DZzh/uFR6YrTb4C+nXakvud8Q4+rbhoIWlYQbUFQ==}
+
+  '@types/node@20.19.43':
+    resolution: {integrity: sha512-6oYBAi5ikg4Pl+kGsoYtawUMBT2zZMCvPNF7pVLnHZfd1zf38DRiWn/gT01RYCdUqkv7Fhr+C9ot4/tb+2sVvA==}
+
+  '@types/node@22.20.5':
+    resolution: {integrity: sha512-U2+DNr+wSjpsTS/wZGYHq7GcwfuSmKiKvoPvK22zwTlRhU91yOniN4qRR5KhIjvif7ysw/dz/hKmfDH0Ris4aA==}
+
   '@types/node@26.6.6':
     resolution: {integrity: sha512-MzQj+8Kx3XI40OmUAE6Qoh58ZMNstNNMwn2nfd3qWsfe7nDNSqJNzes4njhz6AHwrSHOffSLwXU6yb474Q4aog==}
 
@@ -1040,6 +1136,10 @@ packages:
     resolution: {integrity: sha512-oJlA3XiRm7Cyk6qFD2Jn8ak9B7jSy0qy00ADO3+8dpT0LSjFihQYv4C02LFCSYJV3Q37xYwwRy5m+IpIiUzqWw==}
     engines: {node: '>=0.4.0'}
     hasBin: true
+
+  agent-base@6.0.2:
+    resolution: {integrity: sha512-RZNwNclF7+MS/8bDg70amg32dyeZGZxiDuQmZxKLAlQjr3jGyLx+4Kkk58UO7D2QdgFIQCovuSuZESne6RG6XQ==}
+    engines: {node: '>= 6.0.0'}
 
   ansi-regex@5.0.1:
     resolution: {integrity: sha512-quJQXlTSUGL2LH9SUXo8VwsY4soanhgo6LNSm84E1LBcE8s3O0wpdiRzyR9z/ZZJMlMWv37qOOb9pdJlMUEKFQ==}
@@ -1451,6 +1551,13 @@ packages:
     resolution: {integrity: sha512-yhRLQ21U6qa9Hsu2N7Qcbh8tE+WKEcoErjIo56LeSGiGXGp9sA7UpE86Ui9uexb61KakiGwuHMn2QdV7w6i6kQ==}
     engines: {node: '>=16.9.0'}
 
+  https-proxy-agent@5.0.1:
+    resolution: {integrity: sha512-dFcAjpTQFgoLMzC2VwU+C/CbS7uRL0lWmxDITmqm7C+7F0Odmj6s9l6alZc6AELXhrnggM2CeWSXHGOdX2YtwA==}
+    engines: {node: '>= 6'}
+
+  httpx@2.3.3:
+    resolution: {integrity: sha512-k1qv94u1b6e+XKCxVbLgYlOypVP9MPGpnN5G/vxFf6tDO4V3xpz3d6FUOY/s8NtPgaq5RBVVgSB+7IHpVxMYzw==}
+
   human-signals@8.0.1:
     resolution: {integrity: sha512-eKCa6bwnJhvxj14kZk5NCPc6Hb6BdsU9DZcOnmQKSnO1VKrfV0zCvtttPZUsBvjmNDn8rpcJfpwSYnHBjc95MQ==}
     engines: {node: '>=18.18.0'}
@@ -1471,6 +1578,13 @@ packages:
 
   inherits@2.0.4:
     resolution: {integrity: sha512-k/vGaX4/Yla3WzyMCvTQOXYeIHvqOKtnqBduzTHpzpQZzAskKMhZ2K+EnBiSM9zGSoIFeMpXKxa4dYeZIQqewQ==}
+
+  ini@1.3.8:
+    resolution: {integrity: sha512-JV/yugV2uzW5iMRSiZAyDtQd+nxtUnjeLt0acNdw98kKLrvuRVyB80tsREOE7yvGVgalhZ6RNXCmEHkUKBKxew==}
+
+  ip-address@10.7.6:
+    resolution: {integrity: sha512-00LYkM6byILa9eQIx6qoaXCM40xTLd56AZ4vyaPW3YTyb49VZYPo5xsiAq4tuQ54GH4R7gVdYScJ1B7B77PuTg==}
+    engines: {node: '>= 12'}
 
   is-core-module@2.17.0:
     resolution: {integrity: sha512-J/vG0zBCbIKOQFfufSwyXdMrsohyJIUNkrnmo6WZGzoM7tr/lsbfW5b2BvisL6zsyMzK9UxV9L6c7AoFbyXHOA==}
@@ -1546,6 +1660,9 @@ packages:
 
   jsonfile@6.2.1:
     resolution: {integrity: sha512-zwOTdL3rFQ/lRdBnntKVOX6k5cKJwEc1HdilT71BWEu7J41gXIB2MRp+vxduPSwZJPWBxEzv4yH1wYLJGUHX4Q==}
+
+  kitx@2.2.0:
+    resolution: {integrity: sha512-tBMwe6AALTBQJb0woQDD40734NKzb0Kzi3k7wQj9ar3AbP9oqhoVrdXPh7rk2r00/glIgd0YbToIUJsnxWMiIg==}
 
   lazystream@1.0.1:
     resolution: {integrity: sha512-b94GiNHQNy6JNTrt5w6zNyffMrNkXZb3KTkCZJb2V1xaEGCk093vkZ2jk3tpaeP33/OiXC+WvK9AxUebnf5nbw==}
@@ -1631,6 +1748,9 @@ packages:
   lodash.merge@4.6.2:
     resolution: {integrity: sha512-0KpjqXRVvrYyCsX1swR/XTK0va6VQkQM6MNo7PqW77ByjAhoARA8EfrP1N4+KlKj8YS0ZUCtRT/YUuhyYDujIQ==}
 
+  lodash@4.18.1:
+    resolution: {integrity: sha512-dMInicTPVE8d1e5otfwmmjlxkZoUpiVLwyeTdUsi/Caj/gfzzblBcCE5sRHV/AsjuCmxWrte2TNGSYuCeCq+0Q==}
+
   long@5.3.2:
     resolution: {integrity: sha512-mNAgZ1GmyNhD7AuqnTG3/VQ26o760+ZYBPKjPvugO8+nLbYfX6TVpJPseBvopbdY+qpZ/lKUnmEc1LeZYS3QAA==}
 
@@ -1650,12 +1770,12 @@ packages:
   markdown-table@3.0.4:
     resolution: {integrity: sha512-wiYz4+JrLyb/DqW2hkFJxP7Vd7JuTDm77fvbM8VfEQdmSMqcImWeeRbHwZjBjIFki/VaMK2BhFi7oUUZeM5bqw==}
 
-  mastra@1.38.0:
-    resolution: {integrity: sha512-wv236WqbeMyR1luSSWgGixf5GZOeDzGA5ZADLwSEpxjAjbDiztGK9l6krxtgieDxk+pF4F8o4wqrhixHG0KYfQ==}
+  mastra@1.39.0:
+    resolution: {integrity: sha512-tT/HleOkP40umTyihFl9c1hTcqgGF3JXIwiM831iTd+IqIkd7neVbWGRfWYYOIBOZWqKYXv6Mxj00cKdGjRqZA==}
     engines: {node: '>=22.13.0'}
     hasBin: true
     peerDependencies:
-      '@mastra/core': '>=1.81.0-0 <2.0.0-0'
+      '@mastra/core': '>=1.83.0-0 <2.0.0-0'
 
   mdast-util-find-and-replace@3.0.4:
     resolution: {integrity: sha512-z4B5c6jrnJ1ltOQemhWYPBSAo6y42Z8Gt2yEgfgNTMcLSU59B8bfj8Z8AnAlJrBGLnqkdAUZ7jdDEqQw3KuipQ==}
@@ -1797,6 +1917,12 @@ packages:
 
   mlly@1.8.2:
     resolution: {integrity: sha512-d+ObxMQFmbt10sretNDytwt85VrbkhhUA/JBGm1MPaWJ65Cl4wOgLaB1NYvJSZ0Ef03MMEU/0xpPMXUIQ29UfA==}
+
+  moment-timezone@0.5.48:
+    resolution: {integrity: sha512-f22b8LV1gbTO2ms2j2z13MuPogNoh5UzxL3nzNAYKGraILnbGc9NEE6dyiiiLv46DGRb8A4kg8UKWLjPthxBHw==}
+
+  moment@2.31.0:
+    resolution: {integrity: sha512-0acOTfMiWOheYS4eoWb80yYMb/JLvVv9SHbs2PehaDzfUG0Bw855SKyk0IKTnPGa5+U2bmi3W68l1+sGLX/pvw==}
 
   ms@2.1.3:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
@@ -2142,6 +2268,21 @@ packages:
   sisteransi@1.0.5:
     resolution: {integrity: sha512-bLGGlR1QxBcynn2d5YmDX4MGjlZvy2MRBDRNHLJ8VI6l6+9FUiyTFNJ0IveOSP0bcXgVDPRcfGqA0pjaqUpfVg==}
 
+  sm3@1.0.3:
+    resolution: {integrity: sha512-KyFkIfr8QBlFG3uc3NaljaXdYcsbRy1KrSfc4tsQV8jW68jAktGeOcifu530Vx/5LC+PULHT0Rv8LiI8Gw+c1g==}
+
+  smart-buffer@4.2.0:
+    resolution: {integrity: sha512-94hK0Hh8rPqQl2xXc3HsaBoOXKV20MToPkcXvwbISWLEs+64sBq5kFgn2kJDHb1Pry9yrP0dxrCI9RRci7RXKg==}
+    engines: {node: '>= 6.0.0', npm: '>= 3.0.0'}
+
+  socks-proxy-agent@6.2.1:
+    resolution: {integrity: sha512-a6KW9G+6B3nWZ1yB8G7pJwL3ggLy1uTzKAgCb7ttblwqdz9fMGJUuTy3uFzEP48FAs9FLILlmzDlE2JJhVQaXQ==}
+    engines: {node: '>= 10'}
+
+  socks@2.8.10:
+    resolution: {integrity: sha512-e0VyvkVTwVYViNovRkZ9aodhxVlyoMn7eJhVUPxZ+eK9P/7CBkxvvsBOHqFPEH416726W8tLXXXjKwqgTErrCQ==}
+    engines: {node: '>= 10.0.0', npm: '>= 3.0.0'}
+
   sonic-boom@4.2.1:
     resolution: {integrity: sha512-w6AxtubXa2wTXAUsZMMWERrsIRAdrK0Sc+FUytWvYAhBJLyuI4llrMIC1DtlNSdI99EI86KZum2MMq3EAZlF9Q==}
 
@@ -2230,6 +2371,9 @@ packages:
   ufo@1.6.4:
     resolution: {integrity: sha512-JFNbkD1Svwe0KvGi8GOeLcP4kAWQ609twvCdcHxq1oSL8svv39ZuSvajcD8B+5D0eL4+s1Is2D/O6KN3qcTeRA==}
 
+  undici-types@6.21.0:
+    resolution: {integrity: sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==}
+
   undici-types@8.9.0:
     resolution: {integrity: sha512-KTDyRTYX8sWmKXAikPHHSyc63CRPETMctyjKFupcC6OBLXT3xsN0e9aF7m+mIXutFWpUXuedtowG7iLOzp0kQg==}
 
@@ -2280,6 +2424,10 @@ packages:
   uuid@11.1.1:
     resolution: {integrity: sha512-vIYxrBCC/N/K+Js3qSN88go7kIfNPssr/hHCesKCQNAjmgvYS2oqr69kIufEG+O4+PfezOH4EbIeHCfFov8ZgQ==}
     hasBin: true
+
+  validate-npm-package-name@7.0.2:
+    resolution: {integrity: sha512-hVDIBwsRruT73PbK7uP5ebUt+ezEtCmzZz3F59BSr2F6OVFnJ/6h8liuvdLrQ88Xmnk6/+xGGuq+pG9WwTuy3A==}
+    engines: {node: ^20.17.0 || >=22.9.0}
 
   verkit@0.5.0:
     resolution: {integrity: sha512-u4J1hr6Y+C/hit34GwL3eIcUf3wngT8TlYUjK7tk0jxydKLAq3sYvifjdTDA6U3KCKRcQCQDGf/srjxfZF3l7g==}
@@ -2404,6 +2552,14 @@ packages:
       utf-8-validate:
         optional: true
 
+  xml2js@0.6.2:
+    resolution: {integrity: sha512-T4rieHaC1EXcES0Kxxj4JWgaUQHDk+qwHcYOCFHfiwKz7tOVPLq7Hjq9dM1WCMhylqMEfP7hMcOIChvotiZegA==}
+    engines: {node: '>=4.0.0'}
+
+  xmlbuilder@11.0.1:
+    resolution: {integrity: sha512-fDlsI/kFEx7gLvbecc0/ohLG50fugQp8ryHzMTuW9vSa1GJ0XYWKnhsUx7oie3G98+r56aTQIUB4kht42R3JvA==}
+    engines: {node: '>=4.0'}
+
   xtend@4.0.2:
     resolution: {integrity: sha512-LKYU1iAXJXUgAXn9URjiu+MWhyUXHsvfp7mcuYm9dSUKK0/CjtrUwFAxD82/mCWbtLsGjFIad0wIsod4zrTAEQ==}
     engines: {node: '>=0.4'}
@@ -2514,6 +2670,121 @@ snapshots:
   '@ai-sdk/provider@4.0.35':
     dependencies:
       json-schema: 0.4.0
+
+  '@alicloud/credentials@2.4.7':
+    dependencies:
+      '@alicloud/tea-typescript': 1.8.0
+      httpx: 2.3.3
+      ini: 1.3.8
+      kitx: 2.2.0
+    transitivePeerDependencies:
+      - supports-color
+
+  '@alicloud/darabonba-array@0.1.2':
+    dependencies:
+      '@alicloud/tea-typescript': 1.8.0
+    transitivePeerDependencies:
+      - supports-color
+
+  '@alicloud/darabonba-encode-util@0.0.1':
+    dependencies:
+      '@alicloud/tea-typescript': 1.8.0
+      moment: 2.31.0
+    transitivePeerDependencies:
+      - supports-color
+
+  '@alicloud/darabonba-encode-util@0.0.2':
+    dependencies:
+      moment: 2.31.0
+
+  '@alicloud/darabonba-map@0.0.1':
+    dependencies:
+      '@alicloud/tea-typescript': 1.8.0
+    transitivePeerDependencies:
+      - supports-color
+
+  '@alicloud/darabonba-signature-util@0.0.4':
+    dependencies:
+      '@alicloud/darabonba-encode-util': 0.0.1
+    transitivePeerDependencies:
+      - supports-color
+
+  '@alicloud/darabonba-string@1.0.3':
+    dependencies:
+      '@alicloud/tea-typescript': 1.8.0
+    transitivePeerDependencies:
+      - supports-color
+
+  '@alicloud/endpoint-util@0.0.1':
+    dependencies:
+      '@alicloud/tea-typescript': 1.8.0
+      kitx: 2.2.0
+    transitivePeerDependencies:
+      - supports-color
+
+  '@alicloud/gateway-pop@0.0.6':
+    dependencies:
+      '@alicloud/credentials': 2.4.7
+      '@alicloud/darabonba-array': 0.1.2
+      '@alicloud/darabonba-encode-util': 0.0.2
+      '@alicloud/darabonba-map': 0.0.1
+      '@alicloud/darabonba-signature-util': 0.0.4
+      '@alicloud/darabonba-string': 1.0.3
+      '@alicloud/endpoint-util': 0.0.1
+      '@alicloud/gateway-spi': 0.0.8
+      '@alicloud/openapi-util': 0.3.3
+      '@alicloud/tea-typescript': 1.8.0
+      '@alicloud/tea-util': 1.4.11
+    transitivePeerDependencies:
+      - bufferutil
+      - supports-color
+      - utf-8-validate
+
+  '@alicloud/gateway-spi@0.0.8':
+    dependencies:
+      '@alicloud/credentials': 2.4.7
+      '@alicloud/tea-typescript': 1.8.0
+    transitivePeerDependencies:
+      - supports-color
+
+  '@alicloud/openapi-core@1.0.9':
+    dependencies:
+      '@alicloud/credentials': 2.4.7
+      '@alicloud/gateway-pop': 0.0.6
+      '@alicloud/gateway-spi': 0.0.8
+      '@darabonba/typescript': 1.0.6
+    transitivePeerDependencies:
+      - bufferutil
+      - supports-color
+      - utf-8-validate
+
+  '@alicloud/openapi-util@0.3.3':
+    dependencies:
+      '@alicloud/tea-typescript': 1.8.0
+      '@alicloud/tea-util': 1.4.11
+      kitx: 2.2.0
+      sm3: 1.0.3
+    transitivePeerDependencies:
+      - bufferutil
+      - supports-color
+      - utf-8-validate
+
+  '@alicloud/tea-typescript@1.8.0':
+    dependencies:
+      '@types/node': 12.20.55
+      httpx: 2.3.3
+    transitivePeerDependencies:
+      - supports-color
+
+  '@alicloud/tea-util@1.4.11':
+    dependencies:
+      '@alicloud/tea-typescript': 1.8.0
+      '@darabonba/typescript': 1.0.6
+      kitx: 2.2.0
+    transitivePeerDependencies:
+      - bufferutil
+      - supports-color
+      - utf-8-validate
 
   '@arcadeai/arcadejs@2.4.1': {}
 
@@ -2722,12 +2993,28 @@ snapshots:
       dequal: 2.0.3
       zod: 3.25.76
 
-  '@composio/mastra@0.10.6(@composio/core@0.18.1(ws@8.22.0)(zod@3.25.76))(@mastra/core@1.82.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))(zod@3.25.76)':
+  '@composio/mastra@0.10.6(@composio/core@0.18.1(ws@8.22.0)(zod@3.25.76))(@mastra/core@1.83.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))(zod@3.25.76)':
     dependencies:
       '@composio/core': 0.18.1(ws@8.22.0)(zod@3.25.76)
-      '@mastra/core': 1.82.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76)
-      '@mastra/schema-compat': 1.3.17(zod@3.25.76)
+      '@mastra/core': 1.83.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76)
+      '@mastra/schema-compat': 1.4.0(zod@3.25.76)
       zod: 3.25.76
+
+  '@darabonba/typescript@1.0.6':
+    dependencies:
+      '@alicloud/tea-typescript': 1.8.0
+      https-proxy-agent: 5.0.1
+      httpx: 2.3.3
+      lodash: 4.18.1
+      moment: 2.31.0
+      moment-timezone: 0.5.48
+      socks-proxy-agent: 6.2.1
+      ws: 8.22.0
+      xml2js: 0.6.2
+    transitivePeerDependencies:
+      - bufferutil
+      - supports-color
+      - utf-8-validate
 
   '@esbuild/aix-ppc64@0.28.2':
     optional: true
@@ -2873,7 +3160,7 @@ snapshots:
     dependencies:
       '@lukeed/csprng': 1.1.0
 
-  '@mastra/core@1.82.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76)':
+  '@mastra/core@1.83.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76)':
     dependencies:
       '@a2a-js/sdk-v0_3': '@a2a-js/sdk@0.3.14(@grpc/grpc-js@1.14.6)'
       '@a2a-js/sdk-v1': '@a2a-js/sdk@1.0.1(@grpc/grpc-js@1.14.6)'
@@ -2884,7 +3171,7 @@ snapshots:
       '@ai-sdk/provider-v7': '@ai-sdk/provider@4.0.35'
       '@isaacs/ttlcache': 2.1.5
       '@lukeed/uuid': 2.0.1
-      '@mastra/schema-compat': 1.3.17(zod@3.25.76)
+      '@mastra/schema-compat': 1.4.0(zod@3.25.76)
       '@standard-schema/spec': 1.1.0
       chat: 4.44.0(zod@3.25.76)
       croner: 10.0.1
@@ -2926,15 +3213,16 @@ snapshots:
       - zod-openapi
       - zod-to-json-schema
 
-  '@mastra/deployer@1.82.0(@hono/node-server@1.19.17(hono@4.13.14))(@mastra/core@1.82.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))(zod@3.25.76)':
+  '@mastra/deployer@1.83.0(@hono/node-server@1.19.17(hono@4.13.14))(@mastra/core@1.83.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))(zod@3.25.76)':
     dependencies:
       '@babel/core': 8.0.9
       '@babel/preset-typescript': 8.0.7(@babel/core@8.0.9)
       '@babel/traverse': 8.0.7
       '@hono/node-ws': 1.3.1(@hono/node-server@1.19.17(hono@4.13.14))(hono@4.13.14)
-      '@mastra/core': 1.82.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76)
-      '@mastra/server': 1.82.0(@mastra/core@1.82.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))(zod@3.25.76)
+      '@mastra/core': 1.83.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76)
+      '@mastra/server': 1.83.0(@mastra/core@1.83.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))(zod@3.25.76)
       '@optimize-lodash/rollup-plugin': 5.1.0(rollup@4.66.0)
+      '@pnpm/config.parse-overrides': 1100.1.8
       '@rollup/plugin-alias': 6.0.0(rollup@4.66.0)
       '@rollup/plugin-commonjs': 29.0.2(rollup@4.66.0)
       '@rollup/plugin-esm-shim': 0.1.8(rollup@4.66.0)
@@ -2953,24 +3241,26 @@ snapshots:
       resolve.exports: 2.0.4
       rollup: 4.66.0
       rollup-plugin-esbuild: 6.2.1(esbuild@0.28.2)(rollup@4.66.0)
+      semver: 7.8.5
       tinyglobby: 0.2.17
       ws: 8.22.0
       yaml: 2.9.1
     transitivePeerDependencies:
       - '@hono/node-server'
+      - '@mastra/mcp'
       - bufferutil
       - supports-color
       - utf-8-validate
       - zod
 
-  '@mastra/editor@0.17.0(@mastra/core@1.82.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))(ws@8.22.0)(zod@3.25.76)':
+  '@mastra/editor@0.17.1(@mastra/core@1.83.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))(ws@8.22.0)(zod@3.25.76)':
     dependencies:
       '@arcadeai/arcadejs': 2.4.1
       '@composio/core': 0.18.1(ws@8.22.0)(zod@3.25.76)
-      '@composio/mastra': 0.10.6(@composio/core@0.18.1(ws@8.22.0)(zod@3.25.76))(@mastra/core@1.82.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))(zod@3.25.76)
-      '@mastra/core': 1.82.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76)
-      '@mastra/memory': 1.41.0(@mastra/core@1.82.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))
-      '@mastra/schema-compat': 1.3.17(zod@3.25.76)
+      '@composio/mastra': 0.10.6(@composio/core@0.18.1(ws@8.22.0)(zod@3.25.76))(@mastra/core@1.83.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))(zod@3.25.76)
+      '@mastra/core': 1.83.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76)
+      '@mastra/memory': 1.41.1(@mastra/core@1.83.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))
+      '@mastra/schema-compat': 1.4.0(zod@3.25.76)
     transitivePeerDependencies:
       - '@aws-sdk/credential-provider-node'
       - '@smithy/hash-node'
@@ -2980,16 +3270,16 @@ snapshots:
       - ws
       - zod
 
-  '@mastra/loggers@1.3.10(@mastra/core@1.82.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))':
+  '@mastra/loggers@1.3.10(@mastra/core@1.83.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))':
     dependencies:
-      '@mastra/core': 1.82.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76)
+      '@mastra/core': 1.83.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76)
       pino: 10.4.0
       pino-pretty: 13.2.0
 
-  '@mastra/memory@1.41.0(@mastra/core@1.82.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))':
+  '@mastra/memory@1.41.1(@mastra/core@1.83.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))':
     dependencies:
-      '@mastra/core': 1.82.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76)
-      '@mastra/schema-compat': 1.3.17(zod@4.6.7)
+      '@mastra/core': 1.83.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76)
+      '@mastra/schema-compat': 1.4.0(zod@4.6.7)
       async-mutex: 0.5.0
       diff: 9.0.0
       json-schema: 0.4.0
@@ -3000,9 +3290,9 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@mastra/pg@1.35.0(@mastra/core@1.82.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))':
+  '@mastra/pg@1.36.0(@mastra/core@1.83.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))':
     dependencies:
-      '@mastra/core': 1.82.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76)
+      '@mastra/core': 1.83.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76)
       async-mutex: 0.5.0
       pg: 8.23.1
       pg-connection-string: 2.14.1
@@ -3010,21 +3300,21 @@ snapshots:
     transitivePeerDependencies:
       - pg-native
 
-  '@mastra/schema-compat@1.3.17(zod@3.25.76)':
+  '@mastra/schema-compat@1.4.0(zod@3.25.76)':
     dependencies:
       json-schema-to-zod: 2.8.1
       zod: 3.25.76
       zod-from-json-schema: 0.5.2
 
-  '@mastra/schema-compat@1.3.17(zod@4.6.7)':
+  '@mastra/schema-compat@1.4.0(zod@4.6.7)':
     dependencies:
       json-schema-to-zod: 2.8.1
       zod: 4.6.7
       zod-from-json-schema: 0.5.2
 
-  '@mastra/server@1.82.0(@mastra/core@1.82.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))(zod@3.25.76)':
+  '@mastra/server@1.83.0(@mastra/core@1.83.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))(zod@3.25.76)':
     dependencies:
-      '@mastra/core': 1.82.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76)
+      '@mastra/core': 1.83.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76)
       hono: 4.13.14
       zod: 3.25.76
 
@@ -3048,6 +3338,33 @@ snapshots:
   '@oxc-project/types@0.155.0': {}
 
   '@pinojs/redact@0.4.0': {}
+
+  '@pnpm/catalogs.protocol-parser@1100.0.1': {}
+
+  '@pnpm/catalogs.resolver@1100.1.2':
+    dependencies:
+      '@pnpm/catalogs.protocol-parser': 1100.0.1
+      '@pnpm/error': 1100.2.2
+
+  '@pnpm/catalogs.types@1100.0.1': {}
+
+  '@pnpm/config.parse-overrides@1100.1.8':
+    dependencies:
+      '@pnpm/catalogs.resolver': 1100.1.2
+      '@pnpm/catalogs.types': 1100.0.1
+      '@pnpm/error': 1100.2.2
+      '@pnpm/resolving.parse-wanted-dependency': 1100.0.3
+      semver: 7.8.5
+
+  '@pnpm/constants@1102.0.1': {}
+
+  '@pnpm/error@1100.2.2':
+    dependencies:
+      '@pnpm/constants': 1102.0.1
+
+  '@pnpm/resolving.parse-wanted-dependency@1100.0.3':
+    dependencies:
+      validate-npm-package-name: 7.0.2
 
   '@posthog/core@1.61.2':
     dependencies:
@@ -3314,6 +3631,16 @@ snapshots:
 
   '@types/ms@2.1.0': {}
 
+  '@types/node@12.20.55': {}
+
+  '@types/node@20.19.43':
+    dependencies:
+      undici-types: 6.21.0
+
+  '@types/node@22.20.5':
+    dependencies:
+      undici-types: 6.21.0
+
   '@types/node@26.6.6':
     dependencies:
       undici-types: 8.9.0
@@ -3348,6 +3675,12 @@ snapshots:
       event-target-shim: 5.0.1
 
   acorn@8.19.0: {}
+
+  agent-base@6.0.2:
+    dependencies:
+      debug: 4.4.3
+    transitivePeerDependencies:
+      - supports-color
 
   ansi-regex@5.0.1:
     optional: true
@@ -3735,6 +4068,20 @@ snapshots:
 
   hono@4.13.14: {}
 
+  https-proxy-agent@5.0.1:
+    dependencies:
+      agent-base: 6.0.2
+      debug: 4.4.3
+    transitivePeerDependencies:
+      - supports-color
+
+  httpx@2.3.3:
+    dependencies:
+      '@types/node': 20.19.43
+      debug: 4.4.3
+    transitivePeerDependencies:
+      - supports-color
+
   human-signals@8.0.1: {}
 
   iconv-lite@0.4.24:
@@ -3748,6 +4095,10 @@ snapshots:
   import-meta-resolve@4.2.0: {}
 
   inherits@2.0.4: {}
+
+  ini@1.3.8: {}
+
+  ip-address@10.7.6: {}
 
   is-core-module@2.17.0:
     dependencies:
@@ -3799,6 +4150,10 @@ snapshots:
       universalify: 2.0.1
     optionalDependencies:
       graceful-fs: 4.2.11
+
+  kitx@2.2.0:
+    dependencies:
+      '@types/node': 22.20.5
 
   lazystream@1.0.1:
     dependencies:
@@ -3864,6 +4219,8 @@ snapshots:
 
   lodash.merge@4.6.2: {}
 
+  lodash@4.18.1: {}
+
   long@5.3.2:
     optional: true
 
@@ -3881,15 +4238,15 @@ snapshots:
 
   markdown-table@3.0.4: {}
 
-  mastra@1.38.0(@hono/node-server@1.19.17(hono@4.13.14))(@mastra/core@1.82.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))(@opentelemetry/api@1.10.0)(zod@3.25.76):
+  mastra@1.39.0(@hono/node-server@1.19.17(hono@4.13.14))(@mastra/core@1.83.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))(@opentelemetry/api@1.10.0)(zod@3.25.76):
     dependencies:
       '@babel/parser': 8.0.8
       '@babel/types': 8.0.8
       '@clack/prompts': 1.8.1
       '@expo/devcert': 1.2.2
-      '@mastra/core': 1.82.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76)
-      '@mastra/deployer': 1.82.0(@hono/node-server@1.19.17(hono@4.13.14))(@mastra/core@1.82.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))(zod@3.25.76)
-      '@mastra/loggers': 1.3.10(@mastra/core@1.82.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))
+      '@mastra/core': 1.83.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76)
+      '@mastra/deployer': 1.83.0(@hono/node-server@1.19.17(hono@4.13.14))(@mastra/core@1.83.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))(zod@3.25.76)
+      '@mastra/loggers': 1.3.10(@mastra/core@1.83.0(@grpc/grpc-js@1.14.6)(@opentelemetry/api@1.10.0)(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))
       archiver: 8.0.0
       commander: 14.0.3
       dotenv: 17.4.2
@@ -3908,6 +4265,7 @@ snapshots:
       yocto-spinner: 1.2.2
     transitivePeerDependencies:
       - '@hono/node-server'
+      - '@mastra/mcp'
       - '@opentelemetry/api'
       - bare-abort-controller
       - bare-buffer
@@ -4241,6 +4599,12 @@ snapshots:
       pathe: 2.0.3
       pkg-types: 1.3.1
       ufo: 1.6.4
+
+  moment-timezone@0.5.48:
+    dependencies:
+      moment: 2.31.0
+
+  moment@2.31.0: {}
 
   ms@2.1.3: {}
 
@@ -4629,6 +4993,23 @@ snapshots:
 
   sisteransi@1.0.5: {}
 
+  sm3@1.0.3: {}
+
+  smart-buffer@4.2.0: {}
+
+  socks-proxy-agent@6.2.1:
+    dependencies:
+      agent-base: 6.0.2
+      debug: 4.4.3
+      socks: 2.8.10
+    transitivePeerDependencies:
+      - supports-color
+
+  socks@2.8.10:
+    dependencies:
+      ip-address: 10.7.6
+      smart-buffer: 4.2.0
+
   sonic-boom@4.2.1:
     dependencies:
       atomic-sleep: 1.0.0
@@ -4725,6 +5106,8 @@ snapshots:
 
   ufo@1.6.4: {}
 
+  undici-types@6.21.0: {}
+
   undici-types@8.9.0: {}
 
   undici@6.29.1: {}
@@ -4778,6 +5161,8 @@ snapshots:
   util-deprecate@1.0.2: {}
 
   uuid@11.1.1: {}
+
+  validate-npm-package-name@7.0.2: {}
 
   verkit@0.5.0: {}
 
@@ -4842,6 +5227,13 @@ snapshots:
   wrappy@1.0.2: {}
 
   ws@8.22.0: {}
+
+  xml2js@0.6.2:
+    dependencies:
+      sax: 1.6.1
+      xmlbuilder: 11.0.1
+
+  xmlbuilder@11.0.1: {}
 
   xtend@4.0.2: {}
 

@@ -1,0 +1,61 @@
+name: Main release readiness
+
+on:
+  workflow_run:
+    workflows: [Agent CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      verify_approval:
+        description: 'Verify the existing production approval gate only; no server operation'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: huahuo-agent-main-release-readiness
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    if: >-
+      github.repository == 'kyriswu/huahuo-agent' && github.ref == 'refs/heads/main' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.head_repository.full_name == 'kyriswu/huahuo-agent'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      prepared: ${{ steps.prepare.outputs.prepared }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26.11.0'
+          package-manager-cache: false
+      - name: Verify exact main CI and prepare release summary
+        id: prepare
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/release/main-release-readiness.mjs
+  verify-production-approval:
+    name: Verify production approval gate (no deployment)
+    needs: prepare
+    if: github.event_name == 'workflow_dispatch' && inputs.verify_approval && needs.prepare.outputs.prepared == 'true'
+    environment:
+      name: production
+      deployment: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions: {}
+    steps:
+      - name: Record approval-gate verification without server access
+        run: echo 'Production approval gate passed. Production is not connected; no deployment executed.' >> "$GITHUB_STEP_SUMMARY"

@@ -74,4 +74,3 @@ export class ChatGPTOpenAIGateway extends MastraModelGateway {
 }
 
 export const chatgptOpenAIGateway = new ChatGPTOpenAIGateway();
-export const chatgptOpenAIModel = `chatgpt/openai/${getCliProxyModelId()}`;

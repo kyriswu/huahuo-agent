@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "id": "20261116-agent-initial",
+  "baseRevision": null,
+  "services": ["agent"],
+  "database": {
+    "migrations": [],
+    "mastraStorage": "framework-managed",
+    "dataChange": "none"
+  },
+  "configuration": {
+    "mode": "candidate",
+    "reviewedFiles": [".env.example", "compose.yaml", "src/mastra/index.ts", "src/mastra/model-config.ts", "src/auth/service-key.ts", "src/studio/config.ts"],
+    "changes": [
+      { "key": "APP_ENV", "operation": "change", "required": true },
+      { "key": "MASTRA_POSTGRES_PASSWORD", "operation": "add", "required": true },
+      { "key": "HUAHUO_STUDIO_AUTH_ENABLED", "operation": "add", "required": true },
+      { "key": "DEEPSEEK_API_KEY", "operation": "add", "required": true }
+    ],
+    "verifyFile": "scripts/release/changes/20261116-agent-initial/verify-config.mjs"
+  },
+  "compatibility": { "database": true, "api": true, "configuration": true, "skills": true },
+  "smoke": "health"
+}

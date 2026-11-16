@@ -1,0 +1,48 @@
+name: Agent CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, test]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agent-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  agent-ci:
+    name: Agent CI
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      APP_ENV: test
+      MASTRA_POSTGRES_PASSWORD: ''
+      MASTRA_TELEMETRY_DISABLED: '1'
+      MASTRA_SKIP_DOTENV: 'true'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26.11.0'
+          package-manager-cache: false
+      - name: Install locked dependencies
+        run: |
+          npm install --global pnpm@10.15.1
+          pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Validate release plan
+        run: pnpm release:check
+      - name: Unit, contract and release tests (isolated fixtures)
+        run: pnpm test
+      - name: Build API and Studio
+        run: pnpm build --studio
+      - name: Deterministic RAG acceptance
+        run: pnpm rag:acceptance:dense:mock

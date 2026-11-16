@@ -11,6 +11,214 @@ The registered `huox` (HuoX) is the primary business-agent entry point. The
 future Huahuo tools should be attached to the primary agent through application
 services.
 
+## Deep positioning and user memory
+
+HuoX includes `skills/an-deep-positioning`, adapted from the supplied skill
+package. It retains the six entry modes, ten deep-consultation subjects,
+quick consultation, and the first-person, thirteen-section account positioning
+report. Ask HuoX “帮我做深度定位”, describe an initial idea to save, resume a
+consultation, or request the saved report. The native `skill_search`, `skill`,
+and `skill_read` tools load its methods and references on demand. HuoX also
+includes the four creative skills described below. It allows up to twenty model
+steps per request by default so loading the methods and saving a report do not
+stop at the framework's five-step default; per-call options can override it.
+
+HuoX's native `Working Memory` uses the schema in
+`src/mastra/memory/positioning-schema.ts`, with `scope: 'resource'`:
+
+- `positioningReport` is the current report, with thirteen separately editable
+  narrative fields plus stage, adoption status, and sources. Unknown sections
+  stay unset and are shown as not yet discussed in a complete report.
+- `positioningConsultation` holds the current subject, confirmed material,
+  dependencies, and resume point. An initial saved report does not complete
+  the consultation or adopt the agent's recommendations.
+- `languageStyleProfile` contains the current effective style: a short language
+  world, active expression preferences, scenario differences, and source index.
+- `languageStyleLearning` retains authorized source originals, correction
+  comparisons, candidate/inactive preferences, learning records, and conflicts.
+
+The authenticated user's ID is the resource ID. The same user can continue
+with this memory in a new thread; a different user has a separate resource.
+There is one current positioning report per user resource. Credentials are
+kept in server-owned request context and are not fields in this memory schema.
+Recent message history and title generation retain their existing settings.
+
+The native `updateWorkingMemory` tool accepts an object under `memory` and
+merges changed JSON fields. Saving follows the skill's authorization rules:
+explicit requests and approval of a concrete proposal authorize that change;
+viewing, comparison, and temporary creative choices do not. A save is reported
+only after the native tool succeeds. PostgreSQL supports atomic resource JSON
+merges; a model tool's in-memory test fallback does not prove cross-process
+database concurrency.
+
+Business clients can also read or update this memory using the existing
+authenticated native routes:
+
+```http
+GET /api/memory/threads/{threadId}/working-memory?agentId=huox
+POST /api/memory/threads/{threadId}/working-memory?agentId=huox
+Authorization: Bearer <USER_JWT>
+Content-Type: application/json
+
+{"mode":"merge","workingMemory":"{\"positioningReport\":{\"corePositioning\":\"我的账号定位……\"}}"}
+```
+
+The thread must exist and belong to the authenticated resource. The HTTP body
+uses a JSON **string**, unlike the model tool's `memory` object. HTTP merge
+requires a schema-based resource memory and an atomic-merge storage adapter;
+the configured PostgreSQL adapter supports it. Native routes do not treat a
+service key alone as a user identity. A future background/admin integration
+would need its own explicitly authorized identity mapping.
+The model's memory tool validates the configured schema. Direct native HTTP
+or programmatic memory writes do not enforce this business schema themselves;
+business clients should validate with `huoxWorkingMemorySchema` before writing.
+
+The package's Python session snapshots, local project files, immutable
+version folders, and SHA receipts are replaced by native current JSON memory.
+Chat messages retain the conversation and tool-call history; there is no claim
+of file-based history or compare-and-swap versioning. Language-style learning
+and maintenance use the two native JSON fields described below. No Python runtime, shell tool,
+extra model provider, or public MCP endpoint is added.
+
+Run commands from the project root so `./skills/an-deep-positioning` resolves.
+The Docker build copies the same private skill directory to `/app/skills`;
+it is not a publicly served asset directory. The isolated regression is:
+
+```bash
+pnpm exec vitest run test/positioning-memory.test.ts
+```
+
+## Creative skills
+
+HuoX registers four additional native filesystem skills from the supplied
+package. Their complete professional methods, examples, and supporting
+references are bundled under `skills/`; the entry instructions route to the
+matching skill and require its Mastra runtime protocol before applying it.
+No workspace, shell, Python process, extra provider, or external MCP service
+is needed. Docker copies all six skill directories into `/app/skills`.
+
+| Skill | Default delivery and selection | Positioning use |
+| --- | --- | --- |
+| `an-opening-design` / 开头处理 | Sixteen methods in the original order, three candidates each: 48 total, with a separate two-column table per method. Standalone delivery stops after the candidates; full-draft integration follows the user's request or the skill's explicit full-workflow contract. | Audience-related material only. |
+| `an-content-uplift` / 内容升华 | Offer rational lines, deeper theoretical explanations, and emotional lines at their actual insertion points. After selection, integrate only the selected changes into the latest complete draft. | Audience-related material only. |
+| `an-situation-design` / 情境设计 | Four situations: two addressing the camera/audience, two interacting with people or events while a third party records. Compare audiences and tradeoffs, invite selection, then integrate the selected situation into the complete draft. | Relevant positioning; effective style for its spoken copy, supplied material, and current requirements. |
+| `an-prop-design` / 道具设计 | Three metaphor props, three carrier props, and three preparation props: nine total. Explain presentation, relevance, strengths, and limitations for each; invite selection, then integrate into the complete draft. | Audience-related material only. |
+
+For the three audience-only skills, the source protocol permits audience
+information in `coreAudience`, `audienceNeeds`, `coreValue`,
+`personaAndRelationship`, and `boundariesAndOpenQuestions`; only their relevant
+audience portions may be used. These are model instructions about using the
+injected memory, not field-level access controls. Authentication and resource
+ownership remain enforced by the existing server boundary.
+
+Usable current material is sufficient: missing positioning or style does not
+force a new positioning interview. Reuse the newest draft and clear selection
+from the conversation, respect requested local changes, and preserve the
+author's meaning, facts, conditions, and expression strength. A creative choice
+does not become a permanent preference or positioning decision. The original
+opening workflow's two modes are preserved as a calling contract; the broader
+IP/marketing workflow agents themselves are not installed by these skills.
+
+Opening, uplift, and props do not propose or perform profile maintenance.
+Situation design retains the positioning-maintenance protocol: an actual
+long-term change can be proposed and, within the user's authorization, saved
+as a native `updateWorkingMemory` patch to `positioningReport`. It does not
+claim file snapshots, report-version history, or compare-and-swap protection.
+Situation design can also use the saved effective style within its spoken-copy
+scope. An authorized long-term style correction follows the language-style
+skill's learning protocol; a selected situation or generated draft does not
+automatically authorize learning. Provided material and current requirements
+take precedence within their actual scope.
+Drafts are delivered in the conversation; no draft file or business-content
+save API is connected. The skills must not claim such a save occurred.
+
+Each `references/mastra-runtime.md` documents the host adaptations and the
+source files describe their original professional provenance. The regression
+checks native discovery/loading, reference integrity, preserved method
+content, and memory integration using a simulated model. It does not establish
+that a real model follows every candidate count, adoption rule, or writing
+quality requirement:
+
+```bash
+pnpm exec vitest run test/creative-skills.test.ts test/positioning-memory.test.ts
+```
+
+## Language style and resource memory
+
+`skills/an-language-style` is registered on HuoX for profile building,
+continued learning, preference correction/deactivation, checking saved
+evidence, and explicit style writing/editing. It uses the original package's
+learning, application, source classification, and meaning-preservation
+methods. Its former filesystem storage is adapted to the native resource
+schema in `src/mastra/memory/language-style-schema.ts`; the existing positioning
+keys and authentication remain the same.
+
+`languageStyleProfile` separates known background, tentative understanding,
+and future expression goals. Active preferences distinguish observed habits
+from adopted target preferences, with wording/avoidance/local-syntax types,
+scopes, exceptions, and source references. The profile does not prescribe
+topics, opinions, stories, explanations, article structure, or conclusions.
+Only related background and active expression choices apply during writing.
+
+`languageStyleLearning` preserves the exact authorized original text, plus
+the before text for corrections. Sources retain the seven original kinds:
+`author`, `oral`, `correction`, `external`, `preference`, `unknown`, and
+`adopted-ai`, along with scope, source note, and lineage. Source entries have
+required fields; correction sources require and exclusively accept
+`beforeText`, and adopted AI sources require and exclusively accept
+`adoptionNote`. The model memory tool enforces these schema constraints;
+whether the claimed authorship or authorization is true still depends on
+the actual user material. Source/rule IDs are local logical references,
+not generated database message IDs or cryptographic digests.
+
+Candidates, inactive/superseded rules, evidence comparisons, learning records,
+and unresolved conflicts live in the learning field rather than the effective
+profile. Same-draft revisions share lineage and do not become independent
+samples. Ordinary generated copy, a one-time correction, or general approval
+does not become the user's historical writing. Explicit continuing-learning
+authorization applies only to its actual scope; without it, an ordinary edit
+does not authorize saving the whole draft. Stop/replacement updates remove the
+corresponding active entry and retain its actual reason and evidence in the
+learning field. No model confidence percentage or automatic evidence count
+is reported.
+
+Saving uses native `updateWorkingMemory` with changed fields under `memory`.
+Objects merge; arrays replace completely, so updates must keep valid old
+sources and preferences. The two style fields and two positioning fields
+coexist in one resource JSON. One user has one current style across threads;
+there is no per-account/project store. New fields are optional, so existing
+positioning memory needs no data migration or SQL change.
+
+The two style fields are a **logical separation**: Mastra injects the entire
+Working Memory, including source originals and learning records, each turn.
+They are not an on-demand archive or physically hidden context. Longer source
+material increases prompt size and model context use. Ordinary application
+is instructed to use the effective profile; learning and specific calibration
+use only relevant evidence. No separate source-retrieval service is added.
+Independent opening design, content uplift, and prop design continue to
+exclude saved personal style even when it is injected; explicit independent
+style edits and situation-design spoken copy follow their own allowed scope.
+
+The Python store's deterministic SHA deduplication/evidence grouping,
+immutable snapshots, expected-hash conflict checks, automatic backup of manual
+edits, and historical version rollback are not implemented. Native current
+JSON and learning records do not replace that versioned archive. The skill
+must not invent paths, hashes, versions, exact-history recovery, or save
+receipts. Existing user-supplied material can be restored only when its actual
+content is available and the user authorizes the current update.
+
+The isolated regression checks the source schema, preserved professional
+methods, local references, native skill loading, field merges/array replacement,
+cross-thread reuse, and user isolation with scripted model responses:
+
+```bash
+pnpm exec vitest run test/language-style-memory.test.ts
+```
+
+These tests do not establish autonomous learning quality, user-confirmation
+judgment, PostgreSQL cross-process concurrency, or native version-history
+equivalence.
+
 ## Knowledge search direction
 
 Search orchestration depends on the provider contract in
@@ -78,14 +286,15 @@ not write to an external vector index.
 Volta is a prerequisite and must manage the project's Node.js and npm
 versions. pnpm is the package manager declared by the repository.
 
-The Mastra packages are pinned to the November 4, 2026 release:
+The Mastra packages are pinned to the November 12, 2026 release:
 
 | Package | Version |
 | --- | --- |
-| `@mastra/core` | `1.82.0` |
-| `@mastra/memory` | `1.41.0` |
-| `@mastra/pg` | `1.35.0` |
-| `mastra` CLI | `1.38.0` |
+| `@mastra/core` | `1.83.0` |
+| `@mastra/editor` | `0.17.1` |
+| `@mastra/memory` | `1.41.1` |
+| `@mastra/pg` | `1.36.0` |
+| `mastra` CLI | `1.39.0` |
 
 Update these packages together and commit `pnpm-lock.yaml` with the version
 changes. Validate upgrades with `pnpm run typecheck`, `pnpm test`,
@@ -103,10 +312,11 @@ Mastra Studio is served at <http://localhost:4111> by the Mastra development com
 
 ### Agent Editor
 
-`@mastra/editor@0.17.0` is registered on the Mastra instance. Open **Agents → HuoX → Editor**
+`@mastra/editor@0.17.1` is registered on the Mastra instance. Open **Agents → HuoX → Editor**
 to edit instructions and select project tools. HuoX and the weather example keep their
 code-defined instructions and tools as defaults; the Editor supports stored overrides.
-Both existing tools are registered on Mastra so they are available in the editor catalog.
+The RAG, weather, and DeepSeek web tools are registered on Mastra so they are
+available in the editor catalog.
 
 Editor uses the existing `PostgresStore` configured by `MASTRA_POSTGRES_*`; no additional
 database or LibSQL store is required. Save a draft to test changes, then publish it to
@@ -122,6 +332,65 @@ remote human administration needs an appropriately protected trusted deployment 
 This installs the standard Editor. Enterprise Agent Builder and model-powered Builder
 agents are not enabled. See the [official Editor guide](https://mastra.ai/docs/studio/editor).
 
+### Model endpoint
+
+Agents default to `deepseek/deepseek-v4-flash` with `MODEL_PROVIDER=deepseek`.
+Set `DEEPSEEK_API_KEY` and `DEEPSEEK_MODEL` (default `deepseek-v4-flash`);
+the existing DeepSeek key also serves the shared Search/Fetch tools.
+
+The official OpenAI provider remains available with `MODEL_PROVIDER=openai`:
+configure `OPENAI_API_KEY` and `OPENAI_MODEL` (default `gpt-6.1-sol`).
+Mastra's native `openai/<model>` router uses the official OpenAI API.
+
+The existing `CLIPROXY_API_KEY`, `CLIPROXY_BASE_URL`, and `CLIPROXY_MODEL`
+remain available. To restore CLIProxy, set `MODEL_PROVIDER=cliproxy` and recreate
+the container with `docker compose up -d --no-build --force-recreate agent`;
+the retained credentials do not need to be re-entered. Changing
+the provider or model does not change the Agent ID or its chat history.
+
+### Shared web Search and Fetch tools
+
+`src/mastra/tools/mcp/` exports ordinary, reusable Mastra tools for project
+agents. It does not register an MCP server or add an external MCP endpoint.
+The framework's built-in MCP transport is explicitly disabled with
+`server.mcp.enabled=false`, including on authenticated deployments.
+Use the existing `DEEPSEEK_API_KEY` in `.env`; no other web-search configuration
+is required. Credentials are read on the server when a tool is invoked, and
+are never tool arguments.
+
+- `onlineSearch` returns ranked public-web results,
+  including URLs, snippets, summaries, source information, and optional content.
+  It accepts `query`, `count` (1–50, default 10), `ori_question`, `localization`,
+  and `need_content` (default false). Query operators are passed through intact.
+- `urlFetch` accepts an HTTP/HTTPS `url` and returns
+  the page title and Markdown content. URLs with embedded credentials are rejected.
+
+Other code-defined agents can opt in to either tool, or reuse both:
+
+```typescript
+import { deepseekWebTools } from '../tools/mcp/index.ts';
+
+// Add to the agent's existing configuration:
+tools: { ...deepseekWebTools }
+```
+
+HuoX includes both web tools by default, alongside its Huahuo RAG tool. Its
+instructions cover public-web research, reading URLs, and citing sources.
+The same tools are available in the Agent Editor catalog for other stored
+agent configurations.
+
+Each invocation has a 60-second deadline and propagates Agent cancellation.
+One short retry is allowed for explicit HTTP 408, 429, or 5xx responses;
+network failures and timeouts are not automatically replayed. Invalid input,
+missing credentials, authentication/balance failures, and malformed responses
+produce tool errors instead of fabricated search results. Empty search results
+remain a successful response.
+
+DeepSeek bills successful Search/Fetch requests separately from model tokens.
+Search results and fetched pages are untrusted external content; agents should
+cite the original URLs and treat page text as evidence rather than instructions.
+See the [DeepSeek Search & Fetch guide](https://api-docs.deepseek.com/guides/search.md).
+
 When `MASTRA_POSTGRES_PASSWORD` is configured, `PostgresStore` initializes and
 upgrades its tables on startup. To check the built API with an isolated
 in-memory store, run:
@@ -133,17 +402,32 @@ APP_ENV=test MASTRA_POSTGRES_PASSWORD='' PORT=4112 node .mastra/output/index.mjs
 The built API exposes `/health`, `/api/agents`, and `/api/workflows` on that
 port. This check does not verify PostgreSQL persistence.
 
-In local development, Studio does not require a JWT just to open. The HuoX RAG
-tool reads `HUAHUO_AGENT_TO_SERVER_API_KEY` from the Agent `.env`; do not put
-that Service Key in Studio or in a prompt. For a user-scoped RAG run, add the
-user token to Studio's Request Context:
+For test Studio, set `HUAHUO_STUDIO_AUTH_ENABLED=true` with
+`APP_ENV=development` or `test`, then open `/studio-login`. Enter a phone
+number and SMS code using the existing Huahuo Server login. All phone numbers
+accepted by the Server can sign in. Successful login returns to the original
+Studio; there is no need to enter a JWT in Request Context.
 
-```json
-{ "huahuoUserJwt": "<USER_JWT>" }
-```
+The login adapter calls the Server's existing `/api/v1/auth/sms-code`,
+`/api/v1/auth/login`, `/api/v1/auth/refresh`, and `/api/v1/auth/logout` routes.
+It uses `clientType=web`, a persistent browser client ID, and the current
+agreement/privacy versions (`2026-08-20`, matching the App documents).
+If those versions change, set `HUAHUO_STUDIO_AGREEMENT_VERSION` and
+`HUAHUO_STUDIO_PRIVACY_VERSION` and update the copied documents in
+`src/studio/legal.ts`. The checkbox is unchecked by default.
 
-The tool forwards that per-run JWT together with the environment Service Key.
-Production keeps the Agent API routes protected by JWT.
+Access and refresh tokens stay in HttpOnly cookies. Test middleware verifies
+the JWT, scopes memory to its user ID, and supplies the token to tools for
+Server requests. It refreshes expiring tokens automatically and deduplicates
+simultaneous refreshes on this single test instance. No Mastra or Studio
+package files are patched. The HuoX RAG tool continues to read its directional
+Service Key from `.env`; it is never entered in Studio. To switch accounts,
+open `/studio-login` and select **退出登录**.
+
+If a reverse proxy rewrites the public host, set `HUAHUO_STUDIO_ORIGIN` to
+the browser-facing origin (for example `https://agent-test.example.com`).
+Disable this test-only login adapter for production; production retains
+native JWT authentication on Agent API routes.
 
 ## Docker service
 
@@ -153,6 +437,12 @@ the example:
 ```bash
 cp .env.example .env
 ```
+
+The service configuration covers DeepSeek, the model gateway, Server/JWT credentials,
+Docker/Studio, and Mastra PostgreSQL/Memory. RAG parsing, chunking, embedding,
+and reranking belong to `huahuo-server`. The older standalone RAG scripts in
+this repository require explicit `RAG_*` configuration when invoked; those
+settings are omitted from the Agent service's `.env` and example file.
 
 Set the Server URL, JWKS URL, two distinct directional Service Keys (at least
 43 characters each), and the model API key. Configure `MASTRA_POSTGRES_*` to
@@ -178,11 +468,10 @@ Studio uses the browser's address to reach the API, including when the host
 port differs from the container port. The API is at `http://localhost:4111/api`
 and the health check is at `http://localhost:4111/health`.
 
-`APP_ENV` in `.env` controls application authentication. With `development`
-or `test`, Studio and the Agent API open without login; keep this local test
-configuration bound to `127.0.0.1`. A user-scoped RAG run still needs its user
-JWT in Request Context, as described above. Use `APP_ENV=production` for a
-deployment that requires JWT on Agent API requests. Compose defaults to
+`APP_ENV` in `.env` controls application authentication. Test Studio uses
+`development` or `test` with `HUAHUO_STUDIO_AUTH_ENABLED=true`; keep this local
+configuration bound to `127.0.0.1`. Production uses `APP_ENV=production`,
+`HUAHUO_STUDIO_AUTH_ENABLED=false`, and an API-only image. Compose defaults to
 `production` when `APP_ENV` is absent. The container continues to run the
 compiled server with `NODE_ENV=production` in either case.
 
@@ -241,3 +530,12 @@ Stop the service with:
 ```bash
 docker compose down
 ```
+
+## Git release workflow
+
+Development uses `test`; PRs merge after the required `Agent CI` through native
+GitHub Auto-merge. Successful push CI for the exact test SHA triggers the release
+workflow from protected `main`. main merges remain owner-controlled; production
+only prepares a release summary and retains the owner approval gate.
+See [team releases](docs/runbooks/team-releases.md) and the
+[standard release procedure](docs/runbooks/standard-release.md).

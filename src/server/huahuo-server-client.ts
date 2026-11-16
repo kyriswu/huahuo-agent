@@ -30,8 +30,8 @@ export class HuahuoServerClient {
   }
 
   private currentUserJwt(): string {
-    const value = this.requestContext?.get(HUAHUO_USER_JWT_CONTEXT_KEY)
-      ?? this.requestContext?.get(MASTRA_AUTH_TOKEN_KEY);
+    const value = this.requestContext?.get(MASTRA_AUTH_TOKEN_KEY)
+      ?? this.requestContext?.get(HUAHUO_USER_JWT_CONTEXT_KEY);
     if (typeof value !== 'string' || value.trim().length === 0) throw new Error('USER_JWT_REQUIRED');
     return value.trim();
   }

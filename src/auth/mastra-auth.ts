@@ -7,9 +7,8 @@ export const HUAHUO_SUBJECT_CONTEXT_KEY = 'huahuoUserId';
 export const HUAHUO_USER_JWT_CONTEXT_KEY = 'huahuoUserJwt';
 
 const verifier = createHuahuoJwtVerifier();
-// Local Studio can be opened without putting a user JWT in the URL. A
-// user-scoped RAG run still supplies its JWT through RequestContext, while
-// production keeps every Agent API route protected.
+// Test Studio's phone-login middleware supplies the user JWT automatically.
+// Production keeps the native JWT authentication for Agent API routes.
 const localAuthBypassEnvironments = new Set(['development', 'test']);
 export const huahuoApiAuthRequired = !localAuthBypassEnvironments.has(process.env.APP_ENV ?? '');
 const protectedAgentApiRoutes = huahuoApiAuthRequired ? ['/api/*'] : [];
