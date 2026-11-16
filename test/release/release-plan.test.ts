@@ -55,6 +55,15 @@ describe('Agent release plan', () => {
       put('untracked.txt', 'not reviewed'); expect(() => checkReleaseReview(root)).toThrow(); rmSync(join(root, 'untracked.txt'));
       put('src/config.ts', 'export const dirty = true;\n'); expect(() => checkReleaseReview(root)).toThrow();
       put('src/config.ts', 'export {};\n');
+      // A main squash does not have the deployed test merge as an ancestor.
+      const deployed = git('rev-parse', 'HEAD');
+      git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--allow-empty', '-m', 'test merge');
+      p.baseRevision = git('rev-parse', 'HEAD');
+      git('checkout', '--detach', deployed); put('scripts/release/plan.json', JSON.stringify(p)); commit();
+      expect(checkReleaseReview(root).baseRevision).toBe(p.baseRevision);
+      const compatible = { ...p, compatibility: { database: true, api: true, configuration: true, skills: true } };
+      put('scripts/release/plan.json', JSON.stringify(compatible)); commit();
+      expect(() => checkReleasePlan(root)).toThrow();
       put('migrations/0001_legacy.sql', 'SELECT 2;\n'); commit(); expect(() => checkReleaseReview(root)).toThrow();
     } finally { rmSync(root, { recursive: true, force: true }); }
   });
