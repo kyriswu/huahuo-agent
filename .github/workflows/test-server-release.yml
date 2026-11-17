@@ -92,7 +92,9 @@ jobs:
           audience: sts.aliyuncs.com
           role-session-expiration: 5400
           role-session-name: gha-${{ github.run_id }}-${{ github.run_attempt }}
-      - name: Invoke the fixed saved test-server command
+      # The same command returns bounded diagnostic metadata on failure.
+      # No second command, raw-log upload, model analysis or automatic redeploy.
+      - name: Invoke the fixed command and report bounded diagnostics
         if: steps.candidate.outputs.deploy == 'true'
         env:
           GH_TOKEN: ${{ github.token }}

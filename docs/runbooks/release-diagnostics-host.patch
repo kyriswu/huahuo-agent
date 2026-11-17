@@ -1,0 +1,62 @@
+--- huahuo-agent-test-release
++++ huahuo-agent-test-release
+@@ -23,0 +24,16 @@
++
++# Fixed metadata only; never include command arguments, logs or configuration values.
++diagnostic_check, diagnostic_exit_code = 'unknown', None
++DIAGNOSTIC_CODES = {'baseline': 'BASELINE_CHECK_FAILED', 'disk': 'DISK_SPACE_LOW', 'checkout': 'CHECKOUT_FAILED', 'build': 'BUILD_FAILED', 'configuration': 'CONFIGURATION_INVALID', 'server-admission': 'SERVER_PREFLIGHT_FAILED', 'storage': 'STORAGE_INIT_FAILED', 'candidate': 'CANDIDATE_CHECK_FAILED', 'switch': 'SWITCH_FAILED', 'runtime': 'RUNTIME_CHECK_FAILED', 'cleanup': 'CLEANUP_FAILED', 'unknown': 'UNCLASSIFIED_FAILURE'}
++
++def set_check(value):
++    global diagnostic_check, diagnostic_exit_code
++    diagnostic_check, diagnostic_exit_code = value, None
++
++def failure_diagnostic():
++    check = diagnostic_check if diagnostic_check in DIAGNOSTIC_CODES else 'unknown'
++    value = dict(check=check, code=DIAGNOSTIC_CODES[check])
++    if type(diagnostic_exit_code) is int and 0 <= diagnostic_exit_code <= 255:
++        value['exitCode'] = diagnostic_exit_code
++    return value
++
+@@ -27,0 +44 @@
++    global diagnostic_exit_code
+@@ -33 +50,3 @@
+-    if check and result.returncode: fail()
++    if check and result.returncode:
++        diagnostic_exit_code = result.returncode
++        fail()
+@@ -41,0 +61 @@
++    set_check({2: 'storage', 3: 'candidate', 4: 'switch', 5: 'runtime'}.get(number, 'unknown'))
+@@ -139 +159 @@
+-def failure_record():
++def failure_record(diagnostic):
+@@ -146 +166 @@
+-            previousRestoration=restored, successRecorded=committed,
++            previousRestoration=restored, successRecorded=committed, diagnostic=diagnostic,
+@@ -161,0 +182 @@
++    set_check('disk')
+@@ -162,0 +184 @@
++    set_check('checkout')
+@@ -173,0 +196 @@
++    set_check('configuration')
+@@ -180,0 +204 @@
++    set_check('baseline')
+@@ -189,0 +214 @@
++    set_check('configuration')
+@@ -208,0 +234 @@
++    set_check('build')
+@@ -209,0 +236 @@
++    set_check('configuration')
+@@ -216,0 +244 @@
++    set_check('server-admission')
+@@ -220,0 +249 @@
++    set_check('checkout')
+@@ -273,0 +303 @@
++    set_check('cleanup')
+@@ -296 +326,3 @@
+-        failure_record()
++        diagnostic = failure_diagnostic()
++        try: failure_record(diagnostic)
++        except BaseException: pass  # A reporting failure must not hide the original release failure.
+@@ -298 +330 @@
+-        emit(dict(version=1, sha=SHA, stage=STAGE, status='failed', code='FAILED'))
++        emit(dict(version=1, sha=SHA, stage=STAGE, status='failed', code='FAILED', diagnostic=diagnostic))
