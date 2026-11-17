@@ -7,6 +7,8 @@ import { agentModel } from '../model-config.ts';
 import { huahuoRagQueryTool } from '../tools/huahuo-rag-query-tool.ts';
 import { onlineSearch, urlFetch } from '../tools/mcp/index.ts';
 import { huoxWorkingMemorySchema } from '../memory/positioning-schema.ts';
+import { firstTextProcessor } from '../../observability/first-text.js';
+const telemetryProcessor = firstTextProcessor('huox');
 
 /**
  * Primary Huahuo business agent.
@@ -52,7 +54,8 @@ export const huoxAgent = new Agent({
     './skills/an-prop-design',
     './skills/an-language-style',
   ],
-  inputProcessors: [new SkillsProcessor({ injectCatalog: false })],
+  inputProcessors: [telemetryProcessor, new SkillsProcessor({ injectCatalog: false })],
+  outputProcessors: [telemetryProcessor],
   memory: new Memory({
     options: {
       lastMessages: mastraConfig.memoryLastMessages,

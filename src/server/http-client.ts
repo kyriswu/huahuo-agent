@@ -3,10 +3,14 @@ import { z } from 'zod';
 import { getTrustedIdentity, trustedIdentityHeaders } from '../auth/trusted-identity.js';
 import { traceHeaders, validTraceId } from '../trace.js';
 import { resolveHuahuoServerBaseUrl } from './base-url.js';
+import { context, propagation, trace, SpanKind, SpanStatusCode } from '@opentelemetry/api';
+import { agentMetrics, observeSafely, serverOperation, type AgentMetrics, type ClientOutcome } from '../observability/metrics.js';
+import {logger} from '../logging.js';
 
 export interface ServerHttpClientOptions {
   baseUrl?: string;
   fetchImpl?: typeof fetch;
+  metrics?: AgentMetrics;
 }
 
 export interface ServerRequestOptions {
@@ -65,6 +69,13 @@ export class ServerHttpClient {
     const requestTraceId = headers.get('x-trace-id')!;
     const timeoutMs = options.timeoutMs ?? 20_000;
     if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) throw new Error('SERVER_REQUEST_TIMEOUT_INVALID');
+    const operation = serverOperation(path);
+    return trace.getTracer('huahuo-agent.server-client').startActiveSpan(`Server POST ${operation}`, {
+      kind: SpanKind.CLIENT, attributes: { dependency: 'huahuo-server', operation, 'http.request.method': 'POST' },
+    }, async span => {
+    propagation.inject(context.active(), headers, { set: (carrier, key, value) => carrier.set(key, value) });
+    const started = performance.now();
+    let outcome: ClientOutcome = 'success';
     const timeout = new AbortController();
     const timeoutReason = new DOMException('Server request timed out', 'TimeoutError');
     const timer = setTimeout(() => timeout.abort(timeoutReason), timeoutMs);
@@ -105,14 +116,30 @@ export class ServerHttpClient {
       if (!data.success) throw new ServerRequestError('SERVER_RESPONSE_INVALID', 'response', responseTraceId, status);
       return data.data;
     } catch (error) {
-      if (error instanceof ServerRequestError) throw error;
+      if (error instanceof ServerRequestError) {
+        outcome = ({http:'http_error',business:'business_error',network:'network_error',timeout:'timeout',cancelled:'cancelled',response:'response_error'} as const)[error.kind];
+        throw error;
+      }
       if (signal.aborted) {
         const timedOut = signal.reason === timeoutReason;
+        outcome = timedOut ? 'timeout' : 'cancelled';
         throw new ServerRequestError(timedOut ? 'SERVER_TIMEOUT' : 'SERVER_REQUEST_CANCELLED', timedOut ? 'timeout' : 'cancelled', responseTraceId, status);
       }
+      outcome = status === undefined ? 'network_error' : 'response_error';
       throw new ServerRequestError('SERVER_UNAVAILABLE', 'network', responseTraceId, status);
     } finally {
       clearTimeout(timer);
+      observeSafely(() => {
+        const labels = { dependency: 'huahuo-server', operation, method: 'POST', status: status === undefined ? 'none' : String(status), outcome };
+        const metrics = this.options.metrics ?? agentMetrics;
+        metrics.clientRequests.inc(labels); metrics.clientDuration.observe(labels, (performance.now() - started) / 1_000);
+        span.setAttribute('outcome', outcome);
+        if (status !== undefined) span.setAttribute('http.response.status_code', status);
+        if (outcome !== 'success') span.setStatus({ code: SpanStatusCode.ERROR });
+        logger.info('http.client.completed', {...labels,statusCode:status??'none',durationMs:performance.now()-started});
+      });
+      span.end();
     }
+    });
   }
 }

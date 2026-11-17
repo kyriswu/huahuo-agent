@@ -13,8 +13,12 @@ services:
       APP_ENV: ${APP_ENV:-production}
       MASTRA_HOST: 0.0.0.0
       PORT: "4111"
+      METRICS_ENABLED: ${METRICS_ENABLED:-true}
+      METRICS_HOST: 0.0.0.0
+      METRICS_PORT: "9464"
     ports:
       - "${AGENT_BIND_ADDRESS:-127.0.0.1}:${AGENT_PORT:-4111}:4111"
+      - "${METRICS_BIND_HOST:-127.0.0.1}:${METRICS_HOST_PORT:-9469}:9464"
     init: true
     restart: unless-stopped
     stop_grace_period: 60s
