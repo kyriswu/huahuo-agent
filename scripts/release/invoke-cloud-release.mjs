@@ -14,6 +14,23 @@ const MAX_POLLS = 1080;
 const STAGES = ['preflight', 'checkout', 'build', 'migrate', 'verify', 'deploy', 'health', 'smoke', 'cleanup', 'complete'];
 const PHASES = ['预检构建与配置', 'Mastra 存储初始化', '候选验收', '容器切换与旧服务退出', '冒烟与清理'];
 const STAGE_PHASE = { preflight: 1, checkout: 1, build: 1, migrate: 2, verify: 3, deploy: 4, health: 5, smoke: 5, cleanup: 5 };
+// The host classifies a failure before returning it. Arbitrary error text,
+// configuration values, paths and log bodies never cross this boundary.
+const DIAGNOSTIC_CHECKS = Object.freeze({
+  baseline: { code: 'BASELINE_CHECK_FAILED', phases: [1], label: '基准与兼容性检查失败', next: '只读核对宿主成功记录与本期发布计划。' },
+  disk: { code: 'DISK_SPACE_LOW', phases: [1], label: '磁盘空间不足', next: '只读核对 Agent 发布所需空间与保留镜像；不要清理其他项目。' },
+  checkout: { code: 'CHECKOUT_FAILED', phases: [1], label: '准确提交检出失败', next: '核对固定应用与控制 SHA 的可读取性。' },
+  build: { code: 'BUILD_FAILED', phases: [1], label: '候选镜像构建失败', next: '只读检查本次构建日志的安全错误摘要。' },
+  configuration: { code: 'CONFIGURATION_INVALID', phases: [1], label: '配置断言失败', next: '核对本期配置断言与不可变快照，不输出配置值。' },
+  'server-admission': { code: 'SERVER_PREFLIGHT_FAILED', phases: [1], label: 'Server 就绪或匿名鉴权契约预检失败', next: '只读核对既有依赖预检结果，不操作 Server 容器。' },
+  storage: { code: 'STORAGE_INIT_FAILED', phases: [2], label: 'Mastra 存储初始化失败', next: '核对候选启动的安全摘要及已提交存储变化，不重置数据库。' },
+  candidate: { code: 'CANDIDATE_CHECK_FAILED', phases: [3], label: '候选验收失败', next: '只读核对候选健康与匿名 API 拒绝检查。' },
+  switch: { code: 'SWITCH_FAILED', phases: [4], label: '容器切换失败', next: '只读核对本次 Agent 容器和同锁恢复结果。' },
+  runtime: { code: 'RUNTIME_CHECK_FAILED', phases: [5], label: '正式实例冒烟失败', next: '只读核对正式 Agent 健康与同锁恢复结果。' },
+  restore: { code: 'RESTORE_FAILED', phases: [4, 5], label: '应用恢复失败', next: '保留现场，只读核对当前容器、成功镜像和配置记录。' },
+  cleanup: { code: 'CLEANUP_FAILED', phases: [5], label: 'Agent 发布清理失败', next: '核对真实成功记录及待清理项，不将已切换版本误记为旧版。' },
+  unknown: { code: 'UNCLASSIFIED_FAILURE', phases: [1, 2, 3, 4, 5], label: '宿主尚未分类的失败', next: '需要本次 Agent 受限日志的安全摘要，不能仅凭阶段推断原因。' },
+});
 const ERROR_CODES = new Set(['TEST_RELEASE_TARGET_DENIED', 'TEST_RELEASE_COMMAND_INVALID', 'TEST_RELEASE_SHA_INVALID',
   'TEST_RELEASE_STS_REQUIRED', 'TEST_RELEASE_TIMEOUT_INVALID', 'TEST_RELEASE_ACTION_DENIED', 'TEST_RELEASE_CLOUD_RESPONSE_INVALID',
   'TEST_RELEASE_RESULT_MISMATCH', 'TEST_RELEASE_OUTPUT_TRUNCATED', 'TEST_RELEASE_OUTPUT_INVALID', 'TEST_RELEASE_TIMEOUT',
@@ -95,10 +112,23 @@ function execution(response, config, invokeId) {
 
 function terminal(value, config) {
   const result = value;
-  if (!object(result) || Object.keys(result).sort().join(',') !== 'code,sha,stage,status,version'
+  if (!object(result) || !['code,sha,stage,status,version', 'code,diagnostic,sha,stage,status,version'].includes(Object.keys(result).sort().join(','))
     || result.version !== 1 || result.sha !== config.sha || !STAGES.includes(result.stage)
     || !['passed', 'failed'].includes(result.status) || !['OK', 'OK_WITH_FORCED_DRAIN', 'FAILED'].includes(result.code)) fail('TEST_RELEASE_OUTPUT_INVALID');
-  return { version: 1, sha: result.sha, stage: result.stage, status: result.status, code: result.code };
+  let diagnostic, diagnosticStatus = result.status === 'failed' ? 'missing' : undefined;
+  if (Object.hasOwn(result, 'diagnostic')) {
+    if (result.status !== 'failed') fail('TEST_RELEASE_OUTPUT_INVALID');
+    const value = result.diagnostic;
+    const expected = object(value) && typeof value.check === 'string' && Object.hasOwn(DIAGNOSTIC_CHECKS, value.check) ? DIAGNOSTIC_CHECKS[value.check] : undefined;
+    if (expected && ['check,code', 'check,code,exitCode'].includes(Object.keys(value).sort().join(','))
+      && result.code === 'FAILED' && value.code === expected.code && expected.phases.includes(STAGE_PHASE[result.stage])
+      && (!Object.hasOwn(value, 'exitCode') || (Number.isInteger(value.exitCode) && value.exitCode >= 0 && value.exitCode <= 255))) {
+      diagnostic = { check: value.check, code: value.code, ...(Object.hasOwn(value, 'exitCode') ? { exitCode: value.exitCode } : {}) };
+      diagnosticStatus = 'available';
+    } else diagnosticStatus = 'invalid';
+  }
+  return { version: 1, sha: result.sha, stage: result.stage, status: result.status, code: result.code,
+    ...(diagnostic ? { diagnostic } : {}), ...(diagnosticStatus ? { diagnosticStatus } : {}) };
 }
 
 function createProgress(config, onProgress) {
@@ -178,14 +208,16 @@ function completion(item, result) {
     && result.stage === 'complete' && result.status === 'passed' && ['OK', 'OK_WITH_FORCED_DRAIN'].includes(result.code);
   return { status: passed ? 'passed' : 'failed', stage: result.stage, code: passed
     ? (result.code === 'OK_WITH_FORCED_DRAIN' ? 'TEST_RELEASE_OK_WITH_FORCED_DRAIN' : 'TEST_RELEASE_OK')
-    : 'TEST_RELEASE_REMOTE_FAILED' };
+    : 'TEST_RELEASE_REMOTE_FAILED', ...(result.diagnostic ? { diagnostic: result.diagnostic } : {}),
+    ...(result.diagnosticStatus ? { diagnosticStatus: result.diagnosticStatus } : {}) };
 }
 
 export async function runCloudRelease(config, { call, wait = delay, now = () => performance.now(), onProgress } = {}) {
   const started = now();
   let stage = 'configuration', requestCount = 0;
+  let invocationId;
   let progress = createProgress({}, onProgress);
-  const report = result => ({ ...result, progress: progress.snapshot(true), requestCount, durationMs: Math.max(0, Math.round(now() - started)) });
+  const report = result => ({ ...result, ...(invocationId ? { invocationId } : {}), progress: progress.snapshot(true), requestCount, durationMs: Math.max(0, Math.round(now() - started)) });
   try {
     config = validate(config);
     progress = createProgress(config, onProgress);
@@ -212,6 +244,7 @@ export async function runCloudRelease(config, { call, wait = delay, now = () => 
         Parameters: JSON.stringify({ sha: config.sha }), RepeatMode: 'Once', ClientToken: randomUUID() });
     } catch { fail('TEST_RELEASE_SUBMISSION_UNKNOWN'); }
     if (!object(submitted) || typeof submitted.InvokeId !== 'string' || !/^t-[A-Za-z0-9]{5,80}$/.test(submitted.InvokeId)) fail('TEST_RELEASE_CLOUD_RESPONSE_INVALID');
+    invocationId = submitted.InvokeId;
     stage = 'poll';
     for (let attempt = 0; attempt < MAX_POLLS; attempt++) {
       let response;
@@ -248,6 +281,17 @@ export function renderCloudReleaseSummary(result) {
   for (const phase of progress.phases) lines.push('- [' + (phase.status === 'passed' ? 'x' : ' ') + '] ' + phase.phase + '. ' + phase.name + '：' + labels[phase.status]);
   if (progress.failedPhase) lines.push('', '失败位置：第 ' + progress.failedPhase + ' 阶段。');
   if (result.stage) lines.push('', '调用器阶段：' + result.stage + '；结果码：' + result.code + '。');
+  if (typeof result.invocationId === 'string' && /^t-[A-Za-z0-9]{5,80}$/.test(result.invocationId)) lines.push('', '云助手调用：`' + result.invocationId + '`。');
+  if (result.status === 'failed') {
+    const diagnostic = result.diagnostic, expected = object(diagnostic) && typeof diagnostic.check === 'string' && Object.hasOwn(DIAGNOSTIC_CHECKS, diagnostic.check) ? DIAGNOSTIC_CHECKS[diagnostic.check] : undefined;
+    if (expected && diagnostic.code === expected.code) {
+      lines.push('', '宿主诊断：' + expected.label + '（`' + expected.code + '`）' +
+        (Number.isInteger(diagnostic.exitCode) && diagnostic.exitCode >= 0 && diagnostic.exitCode <= 255 ? '；检查退出码：' + diagnostic.exitCode : '') + '。',
+        '', '下一步：' + expected.next);
+    } else lines.push('', result.diagnosticStatus === 'invalid'
+      ? '宿主诊断分类未通过校验，已丢弃；保留原发布失败结果，不能据此推断根因。'
+      : '宿主未提供可验证的诊断分类；仅确认上述阶段或调用结果，不能据此推断根因。');
+  }
   if (result.status === 'failed' && ['poll', 'report'].includes(result.stage) && !progress.failedPhase) lines.push('', '调用器未确认有效的发布结果；请复核现有云助手调用，不得自动重发。');
   if (result.code === 'TEST_RELEASE_OK_WITH_FORCED_DRAIN') lines.push('', '旧服务达到排空上限后被强制停止；本次通过不表示全部请求自然完成。');
   return lines.join('\n') + '\n';
