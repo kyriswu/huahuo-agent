@@ -38,15 +38,29 @@ account/session state. Nginx removes incoming identity headers and injects:
 
 Agent reads these headers in every environment and retains native Mastra auth
 and `mapUserToResourceId`. Tools obtain identity from the reserved Mastra
-provider-user context, never ordinary body/model input. `ragQuery()` forwards
+provider-user context, never ordinary body/model input. `RagClient.query()` forwards
 this identity to `/internal/v1/rag/query` without Authorization or ServiceKey.
 Server retains workspace/document ownership and transaction-level session
 checks. Missing identity does not fall back to a JWT or anonymous user.
 
-`serviceRequest()` is for explicit system operations and does not manufacture
-a user session; user-scoped operations must use the trusted request context.
 Backend networking is unchanged by this implementation. Internal endpoints and
 production stored/editor management are excluded from public gateway routing.
+
+## Client layers
+
+`http-client.ts` owns the Server origin, native fetch connection reuse, timeout
+and cancellation through body consumption, trusted identity/trace headers,
+`success/data/error/traceId` envelope validation and safe typed errors. It never
+retries requests. Errors preserve HTTP status, Server code, trace ID and the
+Server's optional retryable hint; the hint does not trigger replay.
+
+`rag-client.ts` owns the fixed RAG endpoint, business schemas and 60-second query
+budget. It returns validated `data`, preserving retrieval metadata. The Agent
+tool passes only business input, the live request context and abort signal.
+`StudioIdentityClient` shares the HTTP layer for existing login/SMS endpoints,
+explicitly permits anonymous authentication there and retains idempotency keys.
+Login/SMS use the default 20-second budget and propagate request cancellation.
+No generic system-operation client or unused business modules are provided.
 
 ## Studio
 
@@ -93,3 +107,12 @@ these into browser redirects and separate Set-Cookie headers. Agent receives
 only trusted identity and does not interpret these internal response headers.
 Public `/agent/studio-auth/logout` is handled entirely by Server. Agent has no
 duplicate logout route or unauthenticated Studio redirect fallback.
+
+For a gateway-validated browser cookie session, the ingress maps Studio's
+`GET /agent/api/auth/capabilities` to Agent's `/studio-auth/capabilities`, which
+declares its built-in login UI inactive. The
+external gateway already owns browser sign-in; this prevents Studio from asking
+for a second Authorization header. Anonymous requests still receive 401, native
+Bearer capability response contract is checked against the native endpoint, and all business API authentication
+and resource ownership checks remain active. The built-artifact smoke checks
+this path with `NODE_ENV=production`, matching the deployed test container.

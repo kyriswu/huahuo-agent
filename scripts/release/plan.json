@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "id": "20261116-agent-ingress-ready",
-  "baseRevision": "17bf961e709c69dcb9d6ee52904e8c406abb07d4",
+  "id": "20261117-observability",
+  "baseRevision": "8336740de0b4bf7b18f21e9e2f8d39b3e10f7d4b",
   "services": [
     "agent"
   ],
@@ -27,9 +27,103 @@
       "Dockerfile",
       "scripts/release/server-preflight.mjs",
       "scripts/release/runtime-check.mjs",
-      "src/mastra/tools/huahuo-rag-query-tool.ts"
+      "src/mastra/tools/huahuo-rag-query-tool.ts",
+      "src/trace.ts",
+      "src/request-trace.ts",
+      "src/logging.ts",
+      "src/server/http-client.ts",
+      "src/server/rag-client.ts",
+      "src/mastra/gateways/chatgpt-openai-gateway.ts",
+      "src/mastra/tools/mcp/deepseek-web/client.ts",
+      "src/adapters/rag/embedding-client.ts",
+      "package.json",
+      "pnpm-lock.yaml",
+      "tsconfig.json",
+      "src/mastra/agents/huox.ts",
+      "src/mastra/agents/weather-agent.ts",
+      "src/observability/config.ts",
+      "src/observability/first-text.ts",
+      "src/observability/labels.ts",
+      "src/observability/mastra.ts",
+      "src/observability/metrics.ts",
+      "src/observability/tracing.ts",
+      "docs/runbooks/observability.md"
     ],
-    "changes": []
+    "changes": [
+      {
+        "key": "METRICS_ENABLED",
+        "operation": "add",
+        "required": false,
+        "default": "true",
+        "preparation": "reuse previous successful snapshot; no secret preparation",
+        "verification": "local verify-config.mjs; host port binding checked by Compose start"
+      },
+      {
+        "key": "METRICS_HOST",
+        "operation": "add",
+        "required": false,
+        "default": "127.0.0.1 (Compose: 0.0.0.0)",
+        "preparation": "reuse previous successful snapshot; no secret preparation",
+        "verification": "local verify-config.mjs; host port binding checked by Compose start"
+      },
+      {
+        "key": "METRICS_PORT",
+        "operation": "add",
+        "required": false,
+        "default": "9464",
+        "preparation": "reuse previous successful snapshot; no secret preparation",
+        "verification": "local verify-config.mjs; host port binding checked by Compose start"
+      },
+      {
+        "key": "METRICS_BIND_HOST",
+        "operation": "add",
+        "required": false,
+        "default": "127.0.0.1",
+        "preparation": "reuse previous successful snapshot; no secret preparation",
+        "verification": "local verify-config.mjs; host port binding checked by Compose start"
+      },
+      {
+        "key": "METRICS_HOST_PORT",
+        "operation": "add",
+        "required": false,
+        "default": "9469",
+        "preparation": "reuse previous successful snapshot; no secret preparation",
+        "verification": "local verify-config.mjs; host port binding checked by Compose start"
+      },
+      {
+        "key": "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+        "operation": "add",
+        "required": false,
+        "default": "empty; external export disabled",
+        "preparation": "reuse previous successful snapshot; no secret preparation",
+        "verification": "local verify-config.mjs; host port binding checked by Compose start"
+      },
+      {
+        "key": "OTEL_SERVICE_VERSION",
+        "operation": "add",
+        "required": false,
+        "default": "package.version",
+        "preparation": "reuse previous successful snapshot; no secret preparation",
+        "verification": "local verify-config.mjs; host port binding checked by Compose start"
+      },
+      {
+        "key": "OTEL_SERVICE_INSTANCE_ID",
+        "operation": "add",
+        "required": false,
+        "default": "process UUID",
+        "preparation": "reuse previous successful snapshot; no secret preparation",
+        "verification": "local verify-config.mjs; host port binding checked by Compose start"
+      },
+      {
+        "key": "LOG_LEVEL",
+        "operation": "add",
+        "required": false,
+        "default": "info",
+        "preparation": "reuse previous successful snapshot; no secret preparation",
+        "verification": "local verify-config.mjs; host port binding checked by Compose start"
+      }
+    ],
+    "verifyFile": "scripts/release/changes/20261117-observability/verify-config.mjs"
   },
   "compatibility": {
     "database": true,

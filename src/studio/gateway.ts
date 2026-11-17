@@ -7,6 +7,7 @@ import { StudioIdentityClient, StudioLoginError } from './identity-client.js';
 import { tokenCookies } from './token-bridge.js';
 import { legalPage, loginPage } from './pages.js';
 import { studioLegalDocuments } from './legal.js';
+import {traceRequest} from '../request-trace.js';
 
 const phone = z.string().trim().regex(/^(?:\+86)?1[3-9]\d{9}$/u);
 const smsInput = z.object({ phone, requestId: z.string().uuid() }).strict();
@@ -51,6 +52,10 @@ async function jsonBody<T>(c: ContextWithMastra, schema: z.ZodType<T>): Promise<
   try { return schema.parse(JSON.parse(raw)); } catch { throw new StudioLoginError('REQUEST_INVALID', 400); }
 }
 
+function tracedStudioRoute(path:string,options:{method:'GET'|'POST';requiresAuth:false;handler:(c:ContextWithMastra)=>Response|Promise<Response>}){
+  return registerApiRoute(path,{...options,handler:c=>traceRequest(c,async()=>options.handler(c))});
+}
+
 export function createStudioGateway(
   config = loadStudioLoginConfig(),
   identity = new StudioIdentityClient(),
@@ -77,24 +82,24 @@ export function createStudioGateway(
   };
 
   const routes = config.enabled ? [
-    registerApiRoute('/studio-login', { method: 'GET', requiresAuth: false, handler: () => page(nonce => loginPage(nonce, config.publicPath)) }),
-    registerApiRoute('/studio-auth/legal/:document', {
+    tracedStudioRoute('/studio-login', { method: 'GET', requiresAuth: false, handler: () => page(nonce => loginPage(nonce, config.publicPath)) }),
+    tracedStudioRoute('/studio-auth/legal/:document', {
       method: 'GET', requiresAuth: false, handler: c => {
         const key = c.req.param('document');
         const document = key === 'agreement' || key === 'privacy' ? studioLegalDocuments[key] : undefined;
         return document ? page(nonce => legalPage(nonce, document.title, document.text, config.publicPath)) : new Response('Not found', { status: 404 });
       },
     }),
-    registerApiRoute('/studio-auth/sms-code', {
+    tracedStudioRoute('/studio-auth/sms-code', {
       method: 'POST', requiresAuth: false, handler: async c => {
         try {
           assertSameOrigin(c, config);
           const input = await jsonBody(c, smsInput);
-          return c.json(await identity.sendCode(input.phone, input.requestId), 200, { 'cache-control': 'no-store' });
+          return c.json(await identity.sendCode(input.phone, input.requestId, c.req.raw.signal), 200, { 'cache-control': 'no-store' });
         } catch (error) { return failure(error); }
       },
     }),
-    registerApiRoute('/studio-auth/login', {
+    tracedStudioRoute('/studio-auth/login', {
       method: 'POST', requiresAuth: false, handler: async c => {
         try {
           assertSameOrigin(c, config);
@@ -102,13 +107,24 @@ export function createStudioGateway(
           const result = await identity.login({
             ...input, clientType: 'web', clientVersion: 'huahuo-studio/0.1.0',
             agreementVersion: config.agreementVersion, privacyVersion: config.privacyVersion,
-          }, requestId);
+          }, requestId, c.req.raw.signal);
           setCookies(c, result);
           return c.json({ user: result.user }, 200, { 'cache-control': 'no-store' });
         } catch (error) { return failure(error); }
       },
     }),
-    registerApiRoute('/studio-auth/session', {
+    tracedStudioRoute('/studio-auth/capabilities', {
+      method: 'GET', requiresAuth: false, handler: c => {
+        try {
+          const principal = authenticate(c);
+          // The ingress maps Studio's capabilities request here. The native
+          // framework-public auth route intentionally skips user middleware.
+          // Browser login is owned by the gateway; API auth remains native.
+          return c.json({ enabled: principal.authMethod !== 'cookie', login: null }, 200, { 'cache-control': 'no-store' });
+        } catch (error) { return failure(error); }
+      },
+    }),
+    tracedStudioRoute('/studio-auth/session', {
       method: 'GET', requiresAuth: false, handler: async c => {
         try {
           const principal = authenticate(c);

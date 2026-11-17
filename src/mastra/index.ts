@@ -14,6 +14,9 @@ import { huahuoAuth, huahuoAuthMiddleware } from '../auth/mastra-auth.ts';
 import { createStudioGateway } from '../studio/gateway.ts';
 import { agentPublicPath } from '../studio/config.ts';
 import { createStudioPrefixMiddleware } from '../studio/public-prefix.ts';
+import {traceMiddleware} from '../request-trace.js';
+import {logger} from '../logging.js';
+import {createAgentObservability} from '../observability/mastra.js';
 
 function createPostgresStorage() {
   const password = process.env.MASTRA_POSTGRES_PASSWORD?.trim();
@@ -34,8 +37,14 @@ function createPostgresStorage() {
 
 const storage = createPostgresStorage();
 const studioGateway = createStudioGateway();
+const telemetry = createAgentObservability();
+// Mastra catches exporter.init errors, so listener readiness must gate startup here.
+await telemetry.start();
 
 export const mastra = new Mastra({
+  logger,
+  observability: telemetry.observability,
+  loggerOptions: { export: false },
   ...(storage ? { storage } : {}),
   editor: new MastraEditor(),
   server: {
@@ -43,7 +52,7 @@ export const mastra = new Mastra({
     mcp: { enabled: false },
     auth: huahuoAuth,
     apiRoutes: studioGateway.routes,
-    middleware: [createStudioPrefixMiddleware(agentPublicPath()), studioGateway.middleware, huahuoAuthMiddleware],
+    middleware: [createStudioPrefixMiddleware(agentPublicPath()), traceMiddleware, studioGateway.middleware, huahuoAuthMiddleware],
   },
   agents: { huoxAgent, weatherAgent },
   tools: { huahuoRagQueryTool, weatherTool, ...deepseekWebTools },
