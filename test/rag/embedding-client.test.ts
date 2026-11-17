@@ -40,7 +40,7 @@ describe('OpenAICompatibleEmbeddingClient', () => {
       [0.1, 0.2, 0.3],
       [0.4, 0.5, 0.6],
     ]);
-    expect(request?.headers).toMatchObject({
+    expect(Object.fromEntries(new Headers(request?.headers))).toMatchObject({
       authorization: 'Bearer test-key',
       'content-type': 'application/json',
     });

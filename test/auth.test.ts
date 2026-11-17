@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { huahuoAuth, huahuoAuthMiddleware } from '../src/auth/mastra-auth.js';
 import { applyTrustedIdentity, getTrustedIdentity, readTrustedIdentity, trustedIdentityHeaders } from '../src/auth/trusted-identity.js';
 import { resolveHuahuoServerBaseUrl } from '../src/server/base-url.js';
-import { HuahuoServerClient } from '../src/server/huahuo-server-client.js';
+import { RagClient } from '../src/server/rag-client.js';
 
 const alice = 'a0000000-0000-4000-8000-000000000001';
 const bob = 'b0000000-0000-4000-8000-000000000002';
@@ -109,14 +109,14 @@ describe('trusted Agent identity', () => {
   });
 });
 
-describe('direct Server client', () => {
+describe('Server RAG client identity', () => {
   it('sends trusted user context without JWT or ServiceKey', async () => {
-    const fetchMock = vi.fn<typeof fetch>(async () => Response.json({ data: [] }));
+    const fetchMock = vi.fn<typeof fetch>(async () => Response.json({ success: true, data: { mode: 'hybrid', query: 'hello', results: [] }, traceId: 'fixture-trace' }));
     vi.stubGlobal('fetch', fetchMock);
     const context = requestContext();
     context.set('user', identity(bob));
     context.set('huahuoUserJwt', 'forged.jwt.value');
-    await new HuahuoServerClient({ baseUrl: 'http://api-server:3000', requestContext: context }).ragQuery({ query: 'hello', userId: bob });
+    await new RagClient({ baseUrl: 'http://api-server:3000', requestContext: context }).query({ query: 'hello' });
     expect(fetchMock.mock.calls[0][0]).toBe('http://api-server:3000/internal/v1/rag/query');
     const headers = new Headers(fetchMock.mock.calls[0][1]?.headers);
     expect(headers.get('x-huahuo-user-id')).toBe(alice);
@@ -130,7 +130,7 @@ describe('direct Server client', () => {
   it('fails before requesting a user API without trusted context', async () => {
     const fetchMock = vi.fn<typeof fetch>();
     vi.stubGlobal('fetch', fetchMock);
-    await expect(new HuahuoServerClient({ baseUrl: 'http://api-server:3000' }).ragQuery({ query: 'test' })).rejects.toThrow('TRUSTED_IDENTITY_REQUIRED');
+    await expect(new RagClient({ baseUrl: 'http://api-server:3000' }).query({ query: 'test' })).rejects.toThrow('TRUSTED_IDENTITY_REQUIRED');
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -138,23 +138,10 @@ describe('direct Server client', () => {
     const received: Array<string | null> = [];
     vi.stubGlobal('fetch', vi.fn<typeof fetch>(async (_input, init) => {
       received.push(new Headers(init?.headers).get('x-huahuo-user-id'));
-      return Response.json({ data: [] });
+      return Response.json({ success: true, data: { mode: 'hybrid', query: 'hello', results: [] }, traceId: 'fixture-trace' });
     }));
-    await Promise.all([alice, bob].map(userId => new HuahuoServerClient({ baseUrl: 'http://api-server:3000', requestContext: requestContext(userId) }).ragQuery({ query: userId })));
+    await Promise.all([alice, bob].map(userId => new RagClient({ baseUrl: 'http://api-server:3000', requestContext: requestContext(userId) }).query({ query: userId })));
     expect(received.sort()).toEqual([alice, bob]);
-  });
-
-  it('allows background calls only on internal paths and does not invent a user', async () => {
-    const fetchMock = vi.fn<typeof fetch>(async () => Response.json({ success: true }));
-    vi.stubGlobal('fetch', fetchMock);
-    const client = new HuahuoServerClient({ baseUrl: 'http://api-server:3000' });
-    await client.serviceRequest('/internal/v1/system', { task: 'ping' });
-    const headers = new Headers(fetchMock.mock.calls[0][1]?.headers);
-    expect(headers.get('authorization')).toBeNull();
-    expect(headers.get('x-huahuo-service-key')).toBeNull();
-    expect(headers.get('x-huahuo-user-id')).toBeNull();
-    await expect(client.serviceRequest('/api/v1/me/status')).rejects.toThrow('INTERNAL_SERVICE_PATH_REQUIRED');
-    await expect(client.serviceRequest('/internal/v1/../api')).rejects.toThrow('INTERNAL_SERVICE_PATH_REQUIRED');
   });
 
   it('retains explicit Server base URL validation', () => {

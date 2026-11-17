@@ -66,7 +66,7 @@ describe('Mastra runtime compatibility', () => {
 
     const modelRequests: Array<{ headers: Headers; body: ChatRequest }> = [];
     const ragRequests: Array<{ headers: Headers; body: unknown; signal: AbortSignal }> = [];
-    const evidence = { evidence: [{ id: 'upgrade-doc', text: 'Mastra upgrade evidence from the local fixture.' }] };
+    const evidence = { mode: 'hybrid', query: 'Mastra upgrade', results: [{ id: 'upgrade-doc', text: 'Mastra upgrade evidence from the local fixture.' }] };
     const answer = 'The local knowledge evidence confirms the upgrade.';
 
     // Every outbound request is intercepted; unknown destinations fail without using the network.
@@ -89,7 +89,7 @@ describe('Mastra runtime compatibility', () => {
       }
       if (request.url === `${serverBaseUrl}/internal/v1/rag/query`) {
         ragRequests.push({ headers: request.headers, body: await request.json(), signal: request.signal });
-        return Response.json(evidence);
+        return Response.json({ success: true, data: evidence, traceId: 'runtime-regression' });
       }
       throw new Error(`Unexpected outbound request in runtime regression: ${request.url}`);
     }));
