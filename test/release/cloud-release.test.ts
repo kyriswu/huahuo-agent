@@ -207,6 +207,122 @@ describe('reviewed cloud release command with local RPC fixtures only', () => {
   });
 });
 
+describe('bounded host diagnostics for the original release invocation', () => {
+  const failedMarker = (diagnostic?: Record<string, unknown>) => ({ version: 1, sha, stage: 'preflight', status: 'failed', code: 'FAILED',
+    ...(diagnostic ? { diagnostic } : {}) });
+  const failedRecord = (value: unknown) => record({ InvocationStatus: 'Failed', ExitCode: 1, Output: JSON.stringify(value) });
+
+  it('reports a validated host check and exact invocation without another command or raw logs', async () => {
+    const diagnostic = { check: 'configuration', code: 'CONFIGURATION_INVALID', exitCode: 1 };
+    const s = setup(response([failedRecord(failedMarker(diagnostic))]));
+    const result = await runCloudRelease(s.config, s);
+    expect(result).toMatchObject({ status: 'failed', code: 'TEST_RELEASE_REMOTE_FAILED', invocationId: invokeId, diagnosticStatus: 'available', diagnostic });
+    const summary = renderCloudReleaseSummary(result);
+    expect(summary).toContain('配置断言失败'); expect(summary).toContain('CONFIGURATION_INVALID'); expect(summary).toContain(invokeId);
+    expect(summary).toContain('检查退出码：1'); expect(summary).not.toContain('已完成 5');
+    expect(s.call.mock.calls.map(args => args[0])).toEqual(['InvokeCommand', 'DescribeInvocationResults']);
+    expectSanitized(result); expectSanitized(summary);
+  });
+
+  it.each([
+    ['build within preflight', 'preflight', 'build', 'BUILD_FAILED'],
+    ['Server admission within preflight', 'preflight', 'server-admission', 'SERVER_PREFLIGHT_FAILED'],
+    ['storage initialization', 'migrate', 'storage', 'STORAGE_INIT_FAILED'],
+    ['candidate checks', 'verify', 'candidate', 'CANDIDATE_CHECK_FAILED'],
+    ['switching containers', 'deploy', 'switch', 'SWITCH_FAILED'],
+    ['restoring after switch', 'deploy', 'restore', 'RESTORE_FAILED'],
+    ['restoring after health', 'health', 'restore', 'RESTORE_FAILED'],
+    ['runtime checks', 'smoke', 'runtime', 'RUNTIME_CHECK_FAILED'],
+    ['cleanup', 'cleanup', 'cleanup', 'CLEANUP_FAILED'],
+  ])('accepts the fixed classification for %s without inventing progress', async (_name, stage, check, code) => {
+    const diagnostic = { check, code };
+    const s = setup(response([failedRecord({ ...failedMarker(diagnostic), stage })]));
+    const result = await runCloudRelease(s.config, s);
+    expect(result).toMatchObject({ status: 'failed', stage, diagnostic, progress: { visibility: 'terminal_only', completed: null } });
+    expect(s.call.mock.calls.filter(args => args[0] === 'InvokeCommand')).toHaveLength(1); expectSanitized(result);
+  });
+
+  it.each([
+    ['a raw message', { check: 'build', code: 'BUILD_FAILED', message: privateOutput }],
+    ['a log path', { check: 'build', code: 'BUILD_FAILED', logPath: '/private/' + privateOutput }],
+    ['an unknown check', { check: privateOutput, code: 'BUILD_FAILED' }],
+    ['a coerced array check', { check: ['build'], code: 'BUILD_FAILED' }],
+    ['an arbitrary error code', { check: 'build', code: privateOutput }],
+    ['a code for another check', { check: 'configuration', code: 'BUILD_FAILED' }],
+    ['a check from a later phase', { check: 'storage', code: 'STORAGE_INIT_FAILED' }],
+    ['a string exit code', { check: 'build', code: 'BUILD_FAILED', exitCode: '1' }],
+    ['an invalid exit code', { check: 'build', code: 'BUILD_FAILED', exitCode: 256 }],
+  ])('rejects diagnostics containing %s without forwarding the payload', async (_name, diagnostic) => {
+    const s = setup(response([failedRecord(failedMarker(diagnostic))]));
+    const result = await runCloudRelease(s.config, s);
+    expect(result).toMatchObject({ status: 'failed', code: 'TEST_RELEASE_REMOTE_FAILED', invocationId: invokeId, diagnosticStatus: 'invalid' });
+    expect(result).not.toHaveProperty('diagnostic'); expectSanitized(result); expectSanitized(renderCloudReleaseSummary(result));
+    expect(s.call.mock.calls.filter(args => args[0] === 'InvokeCommand')).toHaveLength(1);
+  });
+
+  it('keeps a confirmed preflight failure when the optional diagnosis is malformed', async () => {
+    const bad = failedMarker({ check: 'build', code: 'BUILD_FAILED', raw: privateOutput });
+    const s = setup(response([record({ InvocationStatus: 'Failed', ExitCode: 1,
+      Output: jsonl(progress(1, 'running'), progress(1, 'failed'), bad) })]));
+    const result = await runCloudRelease(s.config, s);
+    expect(result).toMatchObject({ status: 'failed', stage: 'preflight', code: 'TEST_RELEASE_REMOTE_FAILED', diagnosticStatus: 'invalid',
+      progress: { visibility: 'reported', completed: 0, failedPhase: 1 } });
+    expect(result.progress.phases[1].status).toBe('not_run');
+    const summary = renderCloudReleaseSummary(result);
+    expect(summary).toContain('宿主诊断分类未通过校验，已丢弃'); expect(summary).toContain('保留原发布失败结果'); expectSanitized(summary);
+    expect(s.call.mock.calls.filter(args => args[0] === 'InvokeCommand')).toHaveLength(1);
+  });
+
+  it.each([
+    ['another commit', { sha: 'f'.repeat(40) }],
+    ['a successful terminal', { status: 'passed', code: 'OK', stage: 'complete' }],
+  ])('rejects a diagnosis attached to %s', async (_name, change) => {
+    const s = setup(response([failedRecord({ ...failedMarker({ check: 'build', code: 'BUILD_FAILED' }), ...change })]));
+    const result = await runCloudRelease(s.config, s);
+    expect(result).toMatchObject({ status: 'failed', code: 'TEST_RELEASE_OUTPUT_INVALID' }); expect(result).not.toHaveProperty('diagnostic');
+    expectSanitized(result); expect(s.call).toHaveBeenCalledTimes(2);
+  });
+
+  it('explicitly reports missing host diagnosis and retains the original handle after polling timeout', async () => {
+    const s = setup(response([record({ InvocationStatus: 'Running', Output: '' })]));
+    const result = await runCloudRelease(s.config, s);
+    expect(result).toMatchObject({ status: 'failed', code: 'TEST_RELEASE_TIMEOUT', invocationId: invokeId });
+    const summary = renderCloudReleaseSummary(result);
+    expect(summary).toContain('宿主未提供可验证的诊断分类'); expect(summary).toContain('不能据此推断根因'); expect(summary).toContain(invokeId);
+    expect(s.call.mock.calls.filter(args => args[0] === 'InvokeCommand')).toHaveLength(1); expectSanitized(result);
+    const failed = setup(response([failedRecord(failedMarker())]));
+    const confirmed = await runCloudRelease(failed.config, failed);
+    expect(confirmed).toMatchObject({ code: 'TEST_RELEASE_REMOTE_FAILED', diagnosticStatus: 'missing' });
+    expect(renderCloudReleaseSummary(confirmed)).toContain('宿主未提供可验证的诊断分类');
+  });
+
+  it('does not expose an unvalidated invocation ID or echo direct summary fields', async () => {
+    const s = setup(); s.call.mockResolvedValueOnce({ InvokeId: privateOutput });
+    const result = await runCloudRelease(s.config, s);
+    expect(result).not.toHaveProperty('invocationId'); expectSanitized(result);
+    const summary = renderCloudReleaseSummary({ status: 'failed', invocationId: privateOutput, diagnostic: { check: privateOutput, code: privateOutput } });
+    expectSanitized(summary); expect(summary).toContain('宿主未提供可验证的诊断分类');
+  });
+
+  it('writes the safe failure analysis and exact handle to Actions summary without an extra RPC', async () => {
+    const path = directory(), preload = join(path, 'sdk-diagnostic-fixture.mjs'), summary = join(path, 'summary.md');
+    const script = new URL('../../scripts/release/invoke-cloud-release.mjs', import.meta.url).href;
+    const last = response([record({ InvocationStatus: 'Failed', ExitCode: 1,
+      Output: jsonl(progress(1, 'running'), progress(1, 'failed'), failedMarker({ check: 'configuration', code: 'CONFIGURATION_INVALID', exitCode: 1 })) })]);
+    writeFileSync(preload, "import {createRequire} from 'node:module';const {default:Client}=createRequire(" + JSON.stringify(script)
+      + ")('@alicloud/openapi-core');let calls=0;Client.prototype.callApi=async function(params){if(++calls>2)throw Error('unexpected extra RPC');return {body:params.action==='InvokeCommand'?{InvokeId:"
+      + JSON.stringify(invokeId) + '}:' + JSON.stringify(last) + '};};');
+    const result = await cli({ ...env(), GITHUB_STEP_SUMMARY: summary }, preload);
+    expect(result.code).toBe(1); expectSanitized(result);
+    const final = JSON.parse(result.output.trim().split('\n').at(-1)!);
+    expect(final).toMatchObject({ code: 'TEST_RELEASE_REMOTE_FAILED', invocationId: invokeId, diagnosticStatus: 'available',
+      diagnostic: { check: 'configuration', code: 'CONFIGURATION_INVALID', exitCode: 1 }, requestCount: 2 });
+    const contents = readFileSync(summary, 'utf8');
+    expect(contents).toContain('配置断言失败'); expect(contents).toContain(invokeId); expect(contents).toContain('已完成 0 / 5 项');
+    expect(contents).toContain('下一步：'); expectSanitized(contents);
+  });
+});
+
 describe('five-stage cumulative Cloud Assistant progress', () => {
   it('reports only newly observed events, deduplicates cumulative/stale prefixes and updates one summary', async () => {
     const path = join(directory(), 'summary.md'), output: string[] = [];
