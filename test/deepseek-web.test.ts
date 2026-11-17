@@ -30,9 +30,10 @@ describe('DeepSeek Search and Fetch client', () => {
     await expect(client.search({ query })).resolves.toEqual({ results: [searchResult] });
     const [url, init] = fetchImpl.mock.calls[0];
     expect(url).toBe('https://api.deepseek.com/v1/tools/search');
-    expect(init).toMatchObject({ method: 'POST', redirect: 'error', headers: {
+    expect(init).toMatchObject({ method: 'POST', redirect: 'error' });
+    expect(Object.fromEntries(new Headers(init?.headers))).toMatchObject({
       authorization: 'Bearer local-deepseek-key', 'content-type': 'application/json',
-    } });
+    });
     expect(JSON.parse(String(init?.body))).toEqual({ query, count: 10, localization: '', need_content: false });
     expect(init?.signal).toBeInstanceOf(AbortSignal);
   });
@@ -186,7 +187,8 @@ describe('shared in-process web tools', () => {
 
     expect(fetchImpl).toHaveBeenCalledTimes(2);
     for (const [, init] of fetchImpl.mock.calls) {
-      expect(init?.headers).toEqual({ authorization: 'Bearer tool-deepseek-key', 'content-type': 'application/json' });
+      expect(Object.fromEntries(new Headers(init?.headers))).toMatchObject({ authorization: 'Bearer tool-deepseek-key', 'content-type': 'application/json' });
+      expect(new Headers(init?.headers).get('x-trace-id')).toMatch(/^[a-f0-9-]{36}$/);
       expect(JSON.stringify(init)).not.toContain('caller-user-jwt');
     }
   });

@@ -1,4 +1,5 @@
 import { setTimeout as delay } from 'node:timers/promises';
+import {traceHeaders} from '../../../../trace.js';
 import type { z } from 'zod';
 import {
   deepseekFetchInputSchema,
@@ -60,9 +61,10 @@ export class DeepSeekWebClient {
 
     const timeout = AbortSignal.timeout(this.options.timeoutMs ?? REQUEST_TIMEOUT_MS);
     const signal = abortSignal ? AbortSignal.any([abortSignal, timeout]) : timeout;
+    const headers=traceHeaders({authorization:`Bearer ${apiKey}`,'content-type':'application/json'});
     const post = () => (this.options.fetchImpl ?? globalThis.fetch)(`${DEEPSEEK_TOOLS_URL}/${operation}`, {
       method: 'POST',
-      headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
+      headers,
       body: JSON.stringify(input),
       redirect: 'error',
       signal,

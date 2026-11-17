@@ -145,6 +145,7 @@ export class OpenAICompatibleEmbeddingClient implements EmbeddingClientPort {
       body.dimensions = this.options.dimensions;
     }
 
+    const headers=traceHeaders({'content-type':'application/json',authorization:`Bearer ${this.options.apiKey}`});
     let lastError: unknown;
     for (let attempt = 0; attempt <= this.maxRetries; attempt += 1) {
       const controller = new AbortController();
@@ -152,10 +153,7 @@ export class OpenAICompatibleEmbeddingClient implements EmbeddingClientPort {
       try {
         const response = await this.fetchImpl(`${this.options.baseUrl.replace(/\/$/, '')}/embeddings`, {
           method: 'POST',
-          headers: {
-            'content-type': 'application/json',
-            authorization: `Bearer ${this.options.apiKey}`,
-          },
+          headers,
           body: JSON.stringify(body),
           signal: controller.signal,
         });
@@ -257,3 +255,4 @@ export function createEmbeddingClient(config: RagEmbeddingConfig): OpenAICompati
   });
 }
 
+import {traceHeaders} from '../../trace.js';

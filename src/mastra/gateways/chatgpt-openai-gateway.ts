@@ -1,4 +1,5 @@
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
+import {traceHeaders} from '../../trace.js';
 import {
   MastraModelGateway,
   type GatewayLanguageModel,
@@ -67,6 +68,11 @@ export class ChatGPTOpenAIGateway extends MastraModelGateway {
       baseURL: getBaseUrl(),
       headers,
       supportsStructuredOutputs: true,
+      fetch:(input,init)=>{
+        const requestHeaders=new Headers(input instanceof Request?input.headers:undefined);
+        new Headers(init?.headers).forEach((value,key)=>requestHeaders.set(key,value));
+        return fetch(input,{...init,headers:traceHeaders(requestHeaders)});
+      },
     });
 
     return provider.chatModel(modelId);

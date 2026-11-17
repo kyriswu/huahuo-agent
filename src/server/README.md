@@ -38,15 +38,29 @@ account/session state. Nginx removes incoming identity headers and injects:
 
 Agent reads these headers in every environment and retains native Mastra auth
 and `mapUserToResourceId`. Tools obtain identity from the reserved Mastra
-provider-user context, never ordinary body/model input. `ragQuery()` forwards
+provider-user context, never ordinary body/model input. `RagClient.query()` forwards
 this identity to `/internal/v1/rag/query` without Authorization or ServiceKey.
 Server retains workspace/document ownership and transaction-level session
 checks. Missing identity does not fall back to a JWT or anonymous user.
 
-`serviceRequest()` is for explicit system operations and does not manufacture
-a user session; user-scoped operations must use the trusted request context.
 Backend networking is unchanged by this implementation. Internal endpoints and
 production stored/editor management are excluded from public gateway routing.
+
+## Client layers
+
+`http-client.ts` owns the Server origin, native fetch connection reuse, timeout
+and cancellation through body consumption, trusted identity/trace headers,
+`success/data/error/traceId` envelope validation and safe typed errors. It never
+retries requests. Errors preserve HTTP status, Server code, trace ID and the
+Server's optional retryable hint; the hint does not trigger replay.
+
+`rag-client.ts` owns the fixed RAG endpoint, business schemas and 60-second query
+budget. It returns validated `data`, preserving retrieval metadata. The Agent
+tool passes only business input, the live request context and abort signal.
+`StudioIdentityClient` shares the HTTP layer for existing login/SMS endpoints,
+explicitly permits anonymous authentication there and retains idempotency keys.
+Login/SMS use the default 20-second budget and propagate request cancellation.
+No generic system-operation client or unused business modules are provided.
 
 ## Studio
 

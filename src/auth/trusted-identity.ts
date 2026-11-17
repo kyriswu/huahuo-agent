@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import {resolveTraceId} from '../trace.js';
 import { MASTRA_AUTH_TOKEN_KEY, MASTRA_NORMALIZED_USER_KEY, MASTRA_RESOURCE_ID_KEY, type RequestContext } from '@mastra/core/request-context';
 
 export interface TrustedHuahuoIdentity {
@@ -23,7 +23,6 @@ const MASTRA_PROVIDER_USER_KEY = 'mastra__user';
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 // Match Server's existing requestTrace contract. Trace metadata is optional and
 // never determines identity; replace invalid values instead of rejecting auth.
-const traceIdPattern = /^[A-Za-z0-9._:-]{6,96}$/u;
 export type TrustedIdentityHeaders = Headers | Record<string, string | string[] | undefined>;
 
 function header(headers: TrustedIdentityHeaders, name: string): string | undefined {
@@ -42,7 +41,7 @@ export function readTrustedIdentity(headers: TrustedIdentityHeaders): TrustedHua
   const sessionId = header(headers, identityHeaderNames.sessionId);
   const authMethod = header(headers, identityHeaderNames.authMethod);
   const candidateTrace = header(headers, identityHeaderNames.traceId);
-  const traceId = candidateTrace && traceIdPattern.test(candidateTrace) ? candidateTrace : randomUUID();
+  const traceId = resolveTraceId(candidateTrace);
   if (!userId || !sessionId || !uuid.test(userId) || !uuid.test(sessionId)
     || (authMethod !== 'bearer' && authMethod !== 'cookie')) {
     throw new Error('TRUSTED_IDENTITY_INVALID');
