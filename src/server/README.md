@@ -20,8 +20,10 @@ are not stable deployment addresses. Keep the public Studio origin separate.
 A direct instance address does not ensure uninterrupted updates. Callers that
 need release-independent routing use a stable logical service endpoint supplied
 by the deployment. Future Agent replicas sit behind that endpoint; applications
-do not select blue/green slots or maintain replica IP lists. Server currently has
-no outbound Agent business client, so there is no unused reverse-call URL setting.
+do not select blue/green slots or maintain replica IP lists. Server's template
+client uses its `HUAHUO_AGENT_BASE_URL` setting for the private Agent origin.
+The authenticated `POST /internal/v1/ai-template-runs` route accepts a published
+prompt and source text and returns text as JSON or incremental NDJSON.
 Agent's Server client has no automatic retry. The current single-port Agent
 release allows a short interruption; IP/name support does not imply zero-loss
 rolling updates or resumption of an interrupted model stream.

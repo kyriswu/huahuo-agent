@@ -7,6 +7,7 @@ import { huoxAgent } from './agents/huox.ts';
 import { mastraConfig } from './config.ts';
 import { chatgptOpenAIGateway } from './gateways/chatgpt-openai-gateway.ts';
 import { weatherWorkflow } from './workflows/weather-workflow.ts';
+import { createAiTemplateRoute } from './routes/ai-templates.ts';
 import { huahuoRagQueryTool } from './tools/huahuo-rag-query-tool.ts';
 import { weatherTool } from './tools/weather-tool.ts';
 import { deepseekWebTools } from './tools/mcp/index.ts';
@@ -51,7 +52,7 @@ export const mastra = new Mastra({
     studioBase: agentPublicPath(),
     mcp: { enabled: false },
     auth: huahuoAuth,
-    apiRoutes: studioGateway.routes,
+    apiRoutes: [...studioGateway.routes, createAiTemplateRoute()],
     middleware: [createStudioPrefixMiddleware(agentPublicPath()), traceMiddleware, studioGateway.middleware, huahuoAuthMiddleware],
   },
   agents: { huoxAgent, weatherAgent },
