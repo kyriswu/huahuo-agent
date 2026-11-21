@@ -1,6 +1,26 @@
 import type { Middleware, MastraAuthConfig } from '@mastra/core/server';
-import type { RequestContext } from '@mastra/core/request-context';
-import { applyTrustedIdentity, readTrustedIdentity, type TrustedHuahuoIdentity } from './trusted-identity.js';
+import { MASTRA_AUTH_TOKEN_KEY, MASTRA_NORMALIZED_USER_KEY, MASTRA_RESOURCE_ID_KEY, type RequestContext } from '@mastra/core/request-context';
+import { readTrustedIdentity, trustedIdentityHeaders, type TrustedHuahuoIdentity } from './trusted-identity.js';
+
+// Mastra reserves this native provider key and drops it on durable restore.
+const MASTRA_PROVIDER_USER_KEY = 'mastra__user';
+
+/** Set native reserved identity keys so body-supplied resource IDs cannot win. */
+export function applyTrustedIdentity(requestContext: RequestContext, identity: TrustedHuahuoIdentity): void {
+  const validated = readTrustedIdentity(trustedIdentityHeaders(identity));
+  requestContext.set(MASTRA_PROVIDER_USER_KEY, validated);
+  requestContext.set('user', validated);
+  requestContext.set(MASTRA_NORMALIZED_USER_KEY, { id: validated.userId });
+  requestContext.set(MASTRA_RESOURCE_ID_KEY, validated.userId);
+  requestContext.delete(MASTRA_AUTH_TOKEN_KEY);
+}
+
+/** Read the verified provider user from the native Mastra context. */
+export function getTrustedIdentity(requestContext: RequestContext | undefined): TrustedHuahuoIdentity {
+  const value = requestContext?.get(MASTRA_PROVIDER_USER_KEY);
+  if (!value || typeof value !== 'object') throw new Error('TRUSTED_IDENTITY_REQUIRED');
+  return readTrustedIdentity(trustedIdentityHeaders(value as TrustedHuahuoIdentity));
+}
 
 export const huahuoAuth = {
   protected: ['/api/*', '/internal/*'],

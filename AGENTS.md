@@ -3,6 +3,11 @@
 只在本仓库开发 Agent；`../huahuo-server` 为业务 Server 和发布流程参考，不修改其他项目。
 Node 26.11.0 / pnpm 10.15.1 / TypeScript / Mastra；运行配置与凭据不提交 Git。
 
+业务用例、业务契约、适配器、扩展配置和 Server 客户端只能依赖框架无关的输入输出。
+Mastra 的类型、上下文、注册和生命周期留在运行时集成层；进入业务边界前提取已验证的身份、参数和取消信号。
+`test/framework-boundaries.test.ts` 检查这些模块的直接及间接 Mastra 依赖。
+替换实现时，核实调用方后移除废弃入口和配置。需继续支持的兼容逻辑要有明确的调用方和测试。
+
 发布准备使用 `.agents/skills/huahuo-release/SKILL.md` 和 `docs/runbooks/standard-release.md`。
 本地开发分支为 `test`；业务通过 PR 合入 test，准确提交的 Agent CI 成功后由受保护 main 自动发布测试环境。main 由 owner 合并。
 实际权限以 GitHub rulesets/environment 为准，不把仓库文件存在当成已生效。

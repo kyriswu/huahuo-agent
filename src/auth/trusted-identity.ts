@@ -1,5 +1,4 @@
 import {resolveTraceId} from '../trace.js';
-import { MASTRA_AUTH_TOKEN_KEY, MASTRA_NORMALIZED_USER_KEY, MASTRA_RESOURCE_ID_KEY, type RequestContext } from '@mastra/core/request-context';
 
 export interface TrustedHuahuoIdentity {
   readonly id: string;
@@ -16,10 +15,6 @@ export const identityHeaderNames = {
   traceId: 'x-trace-id',
 } as const;
 
-// Mastra's native auth stores the provider user under this reserved key. Unlike
-// an application requestContext key, the HTTP adapter never accepts it from a
-// client body/query, and clears it when restoring a previous durable request.
-const MASTRA_PROVIDER_USER_KEY = 'mastra__user';
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 // Match Server's existing requestTrace contract. Trace metadata is optional and
 // never determines identity; replace invalid values instead of rejecting auth.
@@ -56,21 +51,4 @@ export function trustedIdentityHeaders(identity: TrustedHuahuoIdentity): Record<
     [identityHeaderNames.authMethod]: identity.authMethod,
     [identityHeaderNames.traceId]: identity.traceId,
   };
-}
-
-/** Set native reserved identity keys so body-supplied resource IDs cannot win. */
-export function applyTrustedIdentity(requestContext: RequestContext, identity: TrustedHuahuoIdentity): void {
-  const validated = readTrustedIdentity(trustedIdentityHeaders(identity));
-  requestContext.set(MASTRA_PROVIDER_USER_KEY, validated);
-  requestContext.set('user', validated);
-  requestContext.set(MASTRA_NORMALIZED_USER_KEY, { id: validated.userId });
-  requestContext.set(MASTRA_RESOURCE_ID_KEY, validated.userId);
-  requestContext.delete(MASTRA_AUTH_TOKEN_KEY);
-}
-
-/** Never derive outbound identity from model input or ordinary context keys. */
-export function getTrustedIdentity(requestContext: RequestContext | undefined): TrustedHuahuoIdentity {
-  const value = requestContext?.get(MASTRA_PROVIDER_USER_KEY);
-  if (!value || typeof value !== 'object') throw new Error('TRUSTED_IDENTITY_REQUIRED');
-  return readTrustedIdentity(trustedIdentityHeaders(value as TrustedHuahuoIdentity));
 }

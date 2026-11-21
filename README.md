@@ -219,24 +219,19 @@ These tests do not establish autonomous learning quality, user-confirmation
 judgment, PostgreSQL cross-process concurrency, or native version-history
 equivalence.
 
-## Knowledge search direction
+## Knowledge search
 
-Search orchestration depends on the provider contract in
-`src/contracts/rag-search.ts` and supports `keyword`, `semantic`, and `hybrid`
-modes. The concrete vector backend is intentionally left behind an adapter
-boundary; this project does not ship a direct vector-database SDK or make
-external vector-store connections during startup.
+HuoX's knowledge tool sends `keyword`, `dense`, or `hybrid` queries to
+the private Server RAG endpoint. Server selects the active index and authorized
+sources. Agent validates the request and response and forwards the verified
+identity and cancellation signal. [Server integration](src/server/README.md)
 
-Reranking is an optional injected `Reranker`. It is disabled by default, and
-configured reranker errors are propagated to the caller.
-
-## RAG indexing foundation
+## Standalone RAG indexing tools
 
 The indexing core provides Markdown normalization and chunking, an
 OpenAI-compatible Embedding client, idempotent document-version state, and a
-PostgreSQL canonical chunk-content store. `RagChunkRepositoryPort` is the
-generic boundary for a future vector index implementation. No production
-vector-store command is enabled until that adapter is selected.
+PostgreSQL canonical chunk-content store. The mock flows use an in-memory
+implementation of `RagChunkRepositoryPort` to exercise index writes.
 
 Run the local checks and deterministic mock flow with:
 
@@ -286,20 +281,23 @@ not write to an external vector index.
 Volta is a prerequisite and must manage the project's Node.js and npm
 versions. pnpm is the package manager declared by the repository.
 
-The Mastra packages are pinned to the November 12, 2026 release:
+The Mastra packages are pinned in `package.json` and `pnpm-lock.yaml`:
 
 | Package | Version |
 | --- | --- |
-| `@mastra/core` | `1.83.0` |
-| `@mastra/editor` | `0.17.1` |
-| `@mastra/memory` | `1.41.1` |
-| `@mastra/pg` | `1.36.0` |
-| `mastra` CLI | `1.39.0` |
+| `@mastra/core` | `1.85.0` |
+| `@mastra/server` | `1.85.0` |
+| `@mastra/editor` | `0.17.2` |
+| `@mastra/memory` | `1.41.2` |
+| `@mastra/observability` | `1.24.2` |
+| `@mastra/otel-bridge` | `1.6.1` |
+| `@mastra/pg` | `1.37.0` |
+| `mastra` CLI | `1.40.1` |
 
 Update these packages together and commit `pnpm-lock.yaml` with the version
 changes. Validate upgrades with `pnpm run typecheck`, `pnpm test`,
-`pnpm run build`, and `pnpm run rag:acceptance:dense:mock`. Stop the development
-server before building, because both commands use `.mastra/output`.
+`pnpm build --studio`, `pnpm test:studio:built`, and `pnpm run rag:acceptance:dense:mock`.
+Stop the development server before building, because both commands use `.mastra/output`.
 
 ```bash
 pnpm install
@@ -312,7 +310,7 @@ Mastra Studio is served at <http://localhost:4111> by the Mastra development com
 
 ### Agent Editor
 
-`@mastra/editor@0.17.1` is registered on the Mastra instance. Open **Agents → HuoX → Editor**
+`@mastra/editor` is registered on the Mastra instance. Open **Agents → HuoX → Editor**
 to edit instructions and select project tools. HuoX and the weather example keep their
 code-defined instructions and tools as defaults; the Editor supports stored overrides.
 The RAG, weather, and DeepSeek web tools are registered on Mastra so they are

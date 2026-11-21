@@ -58,7 +58,8 @@ Server's optional retryable hint; the hint does not trigger replay.
 
 `rag-client.ts` owns the fixed RAG endpoint, business schemas and 60-second query
 budget. It returns validated `data`, preserving retrieval metadata. The Agent
-tool passes only business input, the live request context and abort signal.
+tool resolves trusted identity at the Mastra boundary and passes it alongside
+business input and the abort signal.
 `StudioIdentityClient` shares the HTTP layer for existing login/SMS endpoints,
 explicitly permits anonymous authentication there and retains idempotency keys.
 Login/SMS use the default 20-second budget and propagate request cancellation.

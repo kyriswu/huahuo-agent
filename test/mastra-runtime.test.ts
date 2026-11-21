@@ -3,7 +3,8 @@ import { MastraEditor } from '@mastra/editor';
 import { RequestContext } from '@mastra/core/request-context';
 import { InMemoryStore } from '@mastra/core/storage';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { applyTrustedIdentity, readTrustedIdentity } from '../src/auth/trusted-identity.js';
+import { applyTrustedIdentity } from '../src/auth/mastra-auth.js';
+import { readTrustedIdentity } from '../src/auth/trusted-identity.js';
 
 type ChatMessage = {
   role: string;

@@ -36,6 +36,6 @@ fetch('${publicPath}/studio-auth/session',{credentials:'same-origin'}).then(r=>{
 `);
 }
 
-export function legalPage(nonce: string, title: string, text: string, publicPath = '/agent'): string {
+export function legalPage(nonce: string, title: string, text: string): string {
   return document(title, `<header><span>花火</span></header><main class="legal"><h1>${escapeHtml(title)}</h1><pre>${escapeHtml(text)}</pre></main>`, nonce);
 }

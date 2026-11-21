@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "id": "20261118-ai-template-text",
+  "id": "20261122-agent-code-only",
   "baseRevision": "5fa6bbd09acfffe1a53b60b6141f196a13f38520",
   "services": ["agent"],
   "database": {
@@ -17,14 +17,19 @@
       "src/auth/trusted-identity.ts",
       "src/mastra/index.ts",
       "src/mastra/model-config.ts",
-      "src/mastra/routes/ai-templates.ts"
+      "src/mastra/routes/ai-templates.ts",
+      "package.json",
+      "pnpm-lock.yaml",
+      "src/server/http-client.ts",
+      "src/server/rag-client.ts",
+      "src/adapters/rag/embedding-client.ts"
     ],
     "changes": []
   },
   "compatibility": {
     "database": true,
     "api": true,
-    "configuration": true,
+    "configuration": false,
     "skills": true
   },
   "smoke": "health"

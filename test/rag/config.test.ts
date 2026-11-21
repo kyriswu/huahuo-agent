@@ -16,6 +16,11 @@ describe('RAG configuration', () => {
     );
   });
 
+  it('ignores historical Agent retrieval settings when loading indexing configuration', () => {
+    expect(loadRagConfig({ RAG_SEARCH_MODE: 'dense', RAG_RERANK_ENABLED: 'true' }))
+      .toEqual(loadRagConfig({}));
+  });
+
   it('validates dimensions, overlap, and retry limits', () => {
     expect(() => loadRagConfig({ RAG_EMBEDDING_DIMENSIONS: '0' }))
       .toThrow('RAG_EMBEDDING_DIMENSIONS must be a positive integer');
