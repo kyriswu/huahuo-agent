@@ -4,6 +4,7 @@ import {
 } from '../../extensions/huahuo/rag/errors.ts';
 import type { RagEmbeddingConfig } from '../../extensions/huahuo/rag/config.ts';
 import type { EmbeddingClientPort } from '../../extensions/huahuo/rag/types.ts';
+import { traceHeaders } from '../../trace.ts';
 
 export interface EmbeddingClientOptions {
   baseUrl: string;
@@ -251,5 +252,3 @@ export function createEmbeddingClient(config: RagEmbeddingConfig): OpenAICompati
     maxRetries: config.maxRetries,
   });
 }
-
-import {traceHeaders} from '../../trace.js';
