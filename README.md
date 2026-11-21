@@ -286,20 +286,23 @@ not write to an external vector index.
 Volta is a prerequisite and must manage the project's Node.js and npm
 versions. pnpm is the package manager declared by the repository.
 
-The Mastra packages are pinned to the November 12, 2026 release:
+The Mastra packages are pinned in `package.json` and `pnpm-lock.yaml`:
 
 | Package | Version |
 | --- | --- |
-| `@mastra/core` | `1.83.0` |
-| `@mastra/editor` | `0.17.1` |
-| `@mastra/memory` | `1.41.1` |
-| `@mastra/pg` | `1.36.0` |
-| `mastra` CLI | `1.39.0` |
+| `@mastra/core` | `1.85.0` |
+| `@mastra/server` | `1.85.0` |
+| `@mastra/editor` | `0.17.2` |
+| `@mastra/memory` | `1.41.2` |
+| `@mastra/observability` | `1.24.2` |
+| `@mastra/otel-bridge` | `1.6.1` |
+| `@mastra/pg` | `1.37.0` |
+| `mastra` CLI | `1.40.1` |
 
 Update these packages together and commit `pnpm-lock.yaml` with the version
 changes. Validate upgrades with `pnpm run typecheck`, `pnpm test`,
-`pnpm run build`, and `pnpm run rag:acceptance:dense:mock`. Stop the development
-server before building, because both commands use `.mastra/output`.
+`pnpm build --studio`, `pnpm test:studio:built`, and `pnpm run rag:acceptance:dense:mock`.
+Stop the development server before building, because both commands use `.mastra/output`.
 
 ```bash
 pnpm install
@@ -312,7 +315,7 @@ Mastra Studio is served at <http://localhost:4111> by the Mastra development com
 
 ### Agent Editor
 
-`@mastra/editor@0.17.1` is registered on the Mastra instance. Open **Agents → HuoX → Editor**
+`@mastra/editor` is registered on the Mastra instance. Open **Agents → HuoX → Editor**
 to edit instructions and select project tools. HuoX and the weather example keep their
 code-defined instructions and tools as defaults; the Editor supports stored overrides.
 The RAG, weather, and DeepSeek web tools are registered on Mastra so they are
