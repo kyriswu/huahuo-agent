@@ -1,7 +1,9 @@
 import { randomBytes } from 'node:crypto';
 import { registerApiRoute, type ContextWithMastra, type Middleware } from '@mastra/core/server';
 import { z } from 'zod';
-import { readTrustedIdentity, applyTrustedIdentity } from '../auth/trusted-identity.js';
+import { applyTrustedIdentity } from '../auth/mastra-auth.js';
+import { readTrustedIdentity } from '../auth/trusted-identity.js';
+import { logger } from '../logging.js';
 import { loadStudioLoginConfig, type StudioLoginConfig } from './config.js';
 import { StudioIdentityClient, StudioLoginError } from './identity-client.js';
 import { tokenCookies } from './token-bridge.js';
@@ -58,7 +60,7 @@ function tracedStudioRoute(path:string,options:{method:'GET'|'POST';requiresAuth
 
 export function createStudioGateway(
   config = loadStudioLoginConfig(),
-  identity = new StudioIdentityClient(),
+  identity = new StudioIdentityClient({ logger }),
 ) {
   const setCookies = (c: ContextWithMastra, tokens: Parameters<typeof tokenCookies>[0]) => {
     for (const value of tokenCookies(tokens, origin(c, config).startsWith('https:'), config.publicPath)) c.header('Set-Cookie', value, { append: true });
@@ -87,7 +89,7 @@ export function createStudioGateway(
       method: 'GET', requiresAuth: false, handler: c => {
         const key = c.req.param('document');
         const document = key === 'agreement' || key === 'privacy' ? studioLegalDocuments[key] : undefined;
-        return document ? page(nonce => legalPage(nonce, document.title, document.text, config.publicPath)) : new Response('Not found', { status: 404 });
+        return document ? page(nonce => legalPage(nonce, document.title, document.text)) : new Response('Not found', { status: 404 });
       },
     }),
     tracedStudioRoute('/studio-auth/sms-code', {

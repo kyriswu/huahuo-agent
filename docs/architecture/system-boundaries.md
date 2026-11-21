@@ -2,11 +2,10 @@
 
 ## 目标
 
-`huahuo-agent` 是花火 AI App 的独立 Agent 服务，负责 Agent 运行时能力和可重建的检索
-索引状态，不复制 `huahuo-server` 的用户、笔记、文件和知识库业务模型。
+`huahuo-agent` 是花火 AI App 的独立 Agent 服务，负责模型调用、工具、记忆和工作流。
+`huahuo-server` 管理用户、笔记、文件和知识库，并提供授权后的检索结果。
 
-当前仓库保留 `src/mastra` 下的天气 Agent、Tool 和 Workflow 作为 smoke test。RAG 通过
-独立的 Application Service 实现，再由 Mastra Tool 调用。
+当前仓库保留 `src/mastra` 下的天气 Agent、Tool 和 Workflow 作为 smoke test。
 
 ## 服务职责
 
@@ -15,71 +14,56 @@
 - 用户、身份认证、租户和权限判定。
 - 笔记、文章、知识库、订阅和分享等业务实体。
 - 文件资产、对象存储地址和原始文件元数据。
-- 产生文档变更事件，或者调用 Agent 的索引 API。
-- 在每次 Agent 请求前提供可信的授权范围。
+- 验证 Agent 请求的身份，通过受信入口传递用户与会话标识。
+- 提供私有知识库检索 API，负责可见性校验和索引选择。
 
 ### huahuo-agent
 
 - Mastra Agent、Tool、Workflow、Memory 和运行状态。
 - 聊天历史、thread/resource 关联和上下文裁剪。
-- RAG 文档入库、切片、索引版本和检索编排。
-- Embedding、向量索引、Rerank 和业务 API Adapter。
+- 将知识库查询与已验证的用户上下文传给 Server。
+- 提供独立的切片、Embedding 和入库状态验证工具。
 - 通过 API/SSE 提供 Agent 调用和流式结果。
-
-Agent 保存的是派生索引和运行时数据。全文缓存如果存在，也必须标记为可删除、可重建的
-派生副本。
 
 ## 可信边界
 
 ```text
 客户端
-  -> huahuo-server 认证与授权
-  -> huahuo-server 签发 Agent 请求上下文/授权票据
-  -> huahuo-agent 校验票据并取得授权范围
-  -> RAG Application Service 构造不可变过滤条件
-  -> 选定的向量索引 Provider
+  -> 受信入口调用 Server 验证用户和会话
+  -> Agent 将受信身份写入 Mastra 请求上下文
+  -> Agent 知识库工具调用私有 Server RAG API
+  -> Server 校验权限并检索活跃索引
 ```
 
-客户端传入的知识库 ID 只能表达意图，不能直接扩大授权范围。过滤条件必须由可信的服务端
-上下文生成。
+知识库工具接收查询文本、检索模式和数量上限。Server 根据受信用户与会话决定授权范围。
 
 ## 服务交互
 
-### 文档索引
+### 独立入库工具
 
-1. `huahuo-server` 创建或更新文章、文件或知识库关联。
-2. 业务服务提交稳定 `documentId`、`documentVersion`、`contentHash` 和授权上下文。
-3. Agent 获取正文或文件解析文本，不把业务资产迁移为 Agent 的主数据。
-4. Agent 预处理、切片、Embedding，并通过 `RagChunkRepositoryPort` 写入选定的向量索引。
-5. 所有切片完成并通过一致性检查后，Agent 标记版本为 `ready`。
-6. 版本状态切换为 `visible` 后，旧版本进入异步清理队列。
+仓库中的入库、状态迁移和恢复检查通过命令行运行。详见 [RAG 检索与独立入库工具](rag-implementation-plan.md)。
 
 ### Agent 请求
 
-1. 业务服务传入 `threadId`、`resourceId`、用户身份和授权上下文。
+1. 受信入口传入已验证的用户与会话，Agent 用用户身份限制 Mastra Memory 的资源范围。
 2. Agent 读取 Mastra Memory 中的历史并按上下文预算裁剪。
-3. Agent Tool 调用 RAG Application Service。
-4. RAG 服务执行向量检索、可选 Rerank 和按文档聚合。
-5. 如需全文，Agent 通过来源 Adapter 从业务服务加载，并再次校验版本和授权。
-6. Agent 将结构化检索结果交给模型，并通过 SSE 输出阶段事件和最终文本。
+3. 知识库工具通过 `RagClient` 调用 Server，沿用请求身份和取消信号。
+4. Server 返回排序后的文本片段、来源和检索元数据，Agent 将结果交给模型。
 
 ## 目录职责
 
 ```text
 src/mastra/
-  Agent、Tool、Workflow、Memory 注册；Tool 只负责参数校验和调用 Application Service
+  Agent、Tool、Workflow 和 Memory 注册
 
 src/application/
-  RAG 入库、索引版本切换、检索、Rerank、文档聚合等用例
+  独立 RAG 工具的切片、入库和索引版本切换
 
 src/adapters/
-  Embedding、向量索引、Rerank、huahuo-server API、全文读取和持久化实现
-
-src/contracts/
-  跨服务请求/响应 DTO、授权上下文、事件和错误契约
+  独立 RAG 工具的 Embedding 和 PostgreSQL 持久化
 
 src/server/
-  HTTP/SSE 路由、认证票据校验、请求上下文组装和流式输出
+  Server HTTP 客户端和检索契约
 
 src/extensions/huahuo/
   花火配置、默认组合、事件名称和服务地址适配
@@ -87,11 +71,14 @@ src/extensions/huahuo/
 
 只有存在真实用例或适配器时才新增文件，不提前创建空的 domain、repository 或 service 层。
 
+## Mastra 集成边界
+
+Agent、Tool、Workflow、Memory、认证中间件和 Studio 路由在运行时集成层使用 Mastra。
+工具入口从框架上下文提取已验证的花火身份，将身份、业务参数和取消信号传给 Server 客户端。
+业务用例、契约、存储适配器、配置和 Server 客户端可独立加载。
+`test/framework-boundaries.test.ts` 在 CI 检查这些模块的直接和间接 Mastra 导入。
+
 ## 记忆与 RAG 的边界
 
-Mastra Memory 保存对话消息、thread/resource 关联、上下文窗口和 Agent 执行状态。RAG 保存
-文档切片、索引版本和检索元数据。聊天消息不能自动混入知识库切片；知识库文档也不能直接
-充当聊天历史。
-
-后续扩展点包括 `assetId` 引用上传文件、可信授权上下文、Tool/Workflow 状态恢复，以及
-进程重启后从 Mastra Memory 和索引状态继续任务。
+Mastra Memory 保存对话消息、thread/resource 关联和用户工作记忆。Server 的 RAG 存储保存
+文档切片、索引版本和检索元数据。

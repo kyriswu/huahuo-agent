@@ -3,6 +3,7 @@ import { Script } from 'node:vm';
 import { RequestContext, MASTRA_RESOURCE_ID_KEY } from '@mastra/core/request-context';
 import type { ContextWithMastra, Handler, MiddlewareHandler } from '@mastra/core/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { getTrustedIdentity } from '../src/auth/mastra-auth.js';
 import { createStudioGateway } from '../src/studio/gateway.js';
 import { StudioIdentityClient } from '../src/studio/identity-client.js';
 import { tokenCookies } from '../src/studio/token-bridge.js';
@@ -42,7 +43,7 @@ async function fixture(enabled = true) {
     if (path === '/internal/v1/rag/query') return Response.json({ success: true, data: { mode: 'hybrid', query: 'test', results: [{ owner: headers.get('x-huahuo-user-id') }] }, traceId: 'studio-test' });
     throw new Error('Unexpected isolated destination');
   }));
-  const gateway = createStudioGateway({ ...config, enabled }, new StudioIdentityClient('http://business.test'));
+  const gateway = createStudioGateway({ ...config, enabled }, new StudioIdentityClient({ baseUrl: 'http://business.test' }));
   const app = new Hono();
   app.use('*', async (c, next) => { c.set('requestContext', new RequestContext()); await next(); });
   app.use('*', gateway.middleware);
@@ -57,7 +58,7 @@ async function fixture(enabled = true) {
     const context = (c as ContextWithMastra).get('requestContext');
     context.set('huahuoUserId', bob);
     context.set('huahuoUserJwt', 'forged-client-value');
-    return c.json(await new RagClient({ requestContext: context }).query({ query: 'test' }));
+    return c.json(await new RagClient({ identity: getTrustedIdentity(context) }).query({ query: 'test' }));
   });
   return { app, requests };
 }
@@ -158,7 +159,7 @@ describe('Studio behind unified gateway authentication', () => {
   it('does not leak upstream errors or retry stateful authentication requests', async () => {
     const fetcher = vi.fn(async () => Response.json({ success: false, error: { code: 'SMS_RATE_LIMITED', message: 'private details' }, traceId: 'studio-test' }, { status: 429 }));
     vi.stubGlobal('fetch', fetcher);
-    await expect(new StudioIdentityClient('https://business.test').sendCode('13800000001', sessionId)).rejects.toMatchObject({ code: 'SMS_RATE_LIMITED', status: 429 });
+    await expect(new StudioIdentityClient({ baseUrl: 'https://business.test' }).sendCode('13800000001', sessionId)).rejects.toMatchObject({ code: 'SMS_RATE_LIMITED', status: 429 });
     expect(fetcher).toHaveBeenCalledOnce();
   });
 });

@@ -4,10 +4,10 @@ import { MASTRA_AUTH_TOKEN_KEY, MASTRA_RESOURCE_ID_KEY, RequestContext, withoutL
 import type { Handler, MiddlewareHandler } from '@mastra/core/server';
 import { coreAuthMiddleware } from '@mastra/server/auth';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { huahuoAuth, huahuoAuthMiddleware } from '../src/auth/mastra-auth.js';
-import { applyTrustedIdentity, getTrustedIdentity, readTrustedIdentity, trustedIdentityHeaders } from '../src/auth/trusted-identity.js';
+import { applyTrustedIdentity, getTrustedIdentity, huahuoAuth, huahuoAuthMiddleware } from '../src/auth/mastra-auth.js';
+import { readTrustedIdentity, trustedIdentityHeaders } from '../src/auth/trusted-identity.js';
+import { huahuoRagQueryTool } from '../src/mastra/tools/huahuo-rag-query-tool.js';
 import { resolveHuahuoServerBaseUrl } from '../src/server/base-url.js';
-import { RagClient } from '../src/server/rag-client.js';
 
 const alice = 'a0000000-0000-4000-8000-000000000001';
 const bob = 'b0000000-0000-4000-8000-000000000002';
@@ -109,14 +109,15 @@ describe('trusted Agent identity', () => {
   });
 });
 
-describe('Server RAG client identity', () => {
+describe('Mastra RAG tool identity delegation', () => {
   it('sends trusted user context without JWT or ServiceKey', async () => {
     const fetchMock = vi.fn<typeof fetch>(async () => Response.json({ success: true, data: { mode: 'hybrid', query: 'hello', results: [] }, traceId: 'fixture-trace' }));
     vi.stubGlobal('fetch', fetchMock);
+    vi.stubEnv('HUAHUO_SERVER_BASE_URL', 'http://api-server:3000');
     const context = requestContext();
     context.set('user', identity(bob));
     context.set('huahuoUserJwt', 'forged.jwt.value');
-    await new RagClient({ baseUrl: 'http://api-server:3000', requestContext: context }).query({ query: 'hello' });
+    await huahuoRagQueryTool.execute!({ query: 'hello', mode: 'hybrid', topK: 10 }, { requestContext: context });
     expect(fetchMock.mock.calls[0][0]).toBe('http://api-server:3000/internal/v1/rag/query');
     const headers = new Headers(fetchMock.mock.calls[0][1]?.headers);
     expect(headers.get('x-huahuo-user-id')).toBe(alice);
@@ -130,7 +131,9 @@ describe('Server RAG client identity', () => {
   it('fails before requesting a user API without trusted context', async () => {
     const fetchMock = vi.fn<typeof fetch>();
     vi.stubGlobal('fetch', fetchMock);
-    await expect(new RagClient({ baseUrl: 'http://api-server:3000' }).query({ query: 'test' })).rejects.toThrow('TRUSTED_IDENTITY_REQUIRED');
+    const untrusted = new RequestContext();
+    untrusted.set('user', identity());
+    await expect(huahuoRagQueryTool.execute!({ query: 'test', mode: 'hybrid', topK: 10 }, { requestContext: untrusted })).rejects.toThrow('TRUSTED_IDENTITY_REQUIRED');
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -140,7 +143,9 @@ describe('Server RAG client identity', () => {
       received.push(new Headers(init?.headers).get('x-huahuo-user-id'));
       return Response.json({ success: true, data: { mode: 'hybrid', query: 'hello', results: [] }, traceId: 'fixture-trace' });
     }));
-    await Promise.all([alice, bob].map(userId => new RagClient({ baseUrl: 'http://api-server:3000', requestContext: requestContext(userId) }).query({ query: userId })));
+    await Promise.all([alice, bob].map(userId => huahuoRagQueryTool.execute!(
+      { query: userId, mode: 'hybrid', topK: 10 }, { requestContext: requestContext(userId) },
+    )));
     expect(received.sort()).toEqual([alice, bob]);
   });
 

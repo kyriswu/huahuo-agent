@@ -1,5 +1,5 @@
-import type { RequestContext } from '@mastra/core/request-context';
 import { z } from 'zod';
+import type { TrustedHuahuoIdentity } from '../auth/trusted-identity.js';
 import { ServerHttpClient, type ServerHttpClientOptions } from './http-client.js';
 
 const ragQueryModeSchema = z.enum(['keyword', 'dense', 'hybrid']);
@@ -22,21 +22,21 @@ export type RagQueryInput = z.input<typeof ragQueryInputSchema>;
 export type RagQueryResult = z.infer<typeof ragQueryOutputSchema>;
 
 export interface RagClientOptions extends ServerHttpClientOptions {
-  requestContext?: RequestContext;
+  identity: TrustedHuahuoIdentity;
 }
 
 export class RagClient {
   private readonly http: ServerHttpClient;
-  private readonly requestContext?: RequestContext;
+  private readonly identity: TrustedHuahuoIdentity;
 
-  constructor(options: RagClientOptions = {}) {
+  constructor({ identity, ...options }: RagClientOptions) {
     this.http = new ServerHttpClient(options);
-    this.requestContext = options.requestContext;
+    this.identity = identity;
   }
 
   async query(input: RagQueryInput, signal?: AbortSignal): Promise<RagQueryResult> {
     return this.http.post('/internal/v1/rag/query', ragQueryInputSchema.parse(input), ragQueryOutputSchema, {
-      requestContext: this.requestContext,
+      identity: this.identity,
       signal,
       timeoutMs: 60_000,
     });
