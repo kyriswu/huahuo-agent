@@ -219,24 +219,19 @@ These tests do not establish autonomous learning quality, user-confirmation
 judgment, PostgreSQL cross-process concurrency, or native version-history
 equivalence.
 
-## Knowledge search direction
+## Knowledge search
 
-Search orchestration depends on the provider contract in
-`src/contracts/rag-search.ts` and supports `keyword`, `semantic`, and `hybrid`
-modes. The concrete vector backend is intentionally left behind an adapter
-boundary; this project does not ship a direct vector-database SDK or make
-external vector-store connections during startup.
+HuoX's knowledge tool sends `keyword`, `dense`, or `hybrid` queries to
+the private Server RAG endpoint. Server selects the active index and authorized
+sources. Agent validates the request and response and forwards the verified
+identity and cancellation signal. [Server integration](src/server/README.md)
 
-Reranking is an optional injected `Reranker`. It is disabled by default, and
-configured reranker errors are propagated to the caller.
-
-## RAG indexing foundation
+## Standalone RAG indexing tools
 
 The indexing core provides Markdown normalization and chunking, an
 OpenAI-compatible Embedding client, idempotent document-version state, and a
-PostgreSQL canonical chunk-content store. `RagChunkRepositoryPort` is the
-generic boundary for a future vector index implementation. No production
-vector-store command is enabled until that adapter is selected.
+PostgreSQL canonical chunk-content store. The mock flows use an in-memory
+implementation of `RagChunkRepositoryPort` to exercise index writes.
 
 Run the local checks and deterministic mock flow with:
 

@@ -49,10 +49,6 @@ function asIso(value: unknown): string {
   return new Date(String(value)).toISOString();
 }
 
-function optionalIso(value: unknown): string | undefined {
-  return value === null || value === undefined ? undefined : asIso(value);
-}
-
 function mapVersion(row: Record<string, unknown>): IndexVersionRecord {
   return {
     idempotencyKey: String(row.idempotency_key),

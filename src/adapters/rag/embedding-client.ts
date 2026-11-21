@@ -5,9 +5,6 @@ import {
 import type { RagEmbeddingConfig } from '../../extensions/huahuo/rag/config.ts';
 import type { EmbeddingClientPort } from '../../extensions/huahuo/rag/types.ts';
 
-/** Backward-compatible adapter export; the application depends on the port in the domain types. */
-export type EmbeddingClient = EmbeddingClientPort;
-
 export interface EmbeddingClientOptions {
   baseUrl: string;
   apiKey: string;
