@@ -42,13 +42,15 @@ Agent Pod 带 `huahuo.io/api-trusted=true`，符合现有 Server K3s 模板的 A
 | `test` 和 `production` Environment 变量 | `AGENT_K8S_CONTEXT` 与 `AGENT_K8S_NAMESPACE` |
 | `test` 和 `production` Environment Secret | `AGENT_KUBECONFIG`（已授权、有效期内的完整 kubeconfig） |
 
-ACR 和 Kubernetes API 走私网时使用已有可达的 runner。ACR 构建 runner 的 CPU 架构应与 `AGENT_IMAGE_PLATFORM` 一致。也可在可达机器用已有授权 kubeconfig 将 ACR 中的已验摘要部署到指定 namespace。部署身份需要应用清单、监视 rollout 和执行 Pod 冒烟所需权限。保护该身份和目标 namespace 的工作负载写权限。 [ACR 推送凭据](https://www.alibabacloud.com/help/en/acr/user-guide/configure-access-credentials) · [ACK kubeconfig](https://www.alibabacloud.com/help/en/ack/ack-managed-and-ack-dedicated/user-guide/kubeconfig-operation-guide/) · [Kubernetes RBAC 实践](https://kubernetes.io/docs/concepts/security/rbac-good-practices/)
+北京 ACR 专有网络地址为 `huahuoai-docker-hub-registry-vpc.cn-beijing.cr.aliyuncs.com`。将 `AGENT_IMAGE_REPOSITORY` 设置为 `huahuoai-docker-hub-registry-vpc.cn-beijing.cr.aliyuncs.com/<acr-namespace>/<agent-repository>`，用实际的 ACR 命名空间和 Agent 仓库名替换占位符。ACR 命名空间和 Kubernetes namespace 分别配置。
+
+用 `AGENT_ACR_BUILD_RUNNER` 选择能解析并访问该 VPC 地址的现有 runner，CPU 架构应与 `AGENT_IMAGE_PLATFORM` 一致。测试与生产的 Kubernetes 节点也需要能访问该地址以拉取镜像。Kubernetes API 走私网时，用 `AGENT_K8S_RUNNER` 选择可达且获授权的 runner。也可在可达机器用已有授权 kubeconfig 部署已验摘要。部署身份需要应用清单、监视 rollout 和执行 Pod 冒烟所需权限。 [ACR VPC 访问](https://www.alibabacloud.com/help/en/acr/user-guide/configure-access-over-vpcs) · [ACR 推送凭据](https://www.alibabacloud.com/help/en/acr/user-guide/configure-access-credentials) · [ACK kubeconfig](https://www.alibabacloud.com/help/en/ack/ack-managed-and-ack-dedicated/user-guide/kubeconfig-operation-guide/) · [Kubernetes RBAC 实践](https://kubernetes.io/docs/concepts/security/rbac-good-practices/)
 
 ```bash
 KUBECONFIG=/path/to/approved-kubeconfig \
 AGENT_K8S_CONTEXT=approved-context \
 AGENT_K8S_NAMESPACE=approved-namespace \
-AGENT_IMAGE_REPOSITORY=registry.example.com/huahuo/huahuo-agent \
+AGENT_IMAGE_REPOSITORY='huahuoai-docker-hub-registry-vpc.cn-beijing.cr.aliyuncs.com/<acr-namespace>/<agent-repository>' \
 scripts/kubernetes/deploy.sh test 'sha256:<verified-digest>'
 ```
 
