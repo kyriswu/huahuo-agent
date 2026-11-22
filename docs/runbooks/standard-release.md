@@ -4,7 +4,7 @@
 
 ## 接入已有集群
 
-1. 确认目标 context、namespace、节点架构、镜像仓库与 runner 到 Kubernetes API 的网络路径。测试和生产分别使用各自的授权与配置。Namespace 由集群运维创建。
+1. 确认目标 context、namespace、可调度的 Linux ARM64 节点、镜像仓库与部署端到 Kubernetes API 的网络路径。测试和生产分别使用各自的授权与配置。Namespace 由集群运维创建。
 2. 在目标 namespace 准备 `huahuo-agent-config` ConfigMap 和 `huahuo-agent-secrets` Secret。Agent 使用独立的持久化 PostgreSQL 数据库。测试和生产各用已确认的目标库。
 3. 配置集群拉取私有 ACR 镜像的权限。有现成 ACK 免密拉取配置时可沿用，其他集群可在 Agent 的 ServiceAccount 上挂接预置的 imagePullSecret。应用 Pod 不挂载 Kubernetes API token。 [ACR 私有镜像拉取](https://www.alibabacloud.com/help/en/acr/user-guide/non-secret-pulling-container-image)
 4. 核对网关和 Server 的私网流向。Agent 与 Server 在同一 namespace 时可以使用 `http://huahuo-api:3000` 作为 Server origin。Server 需要调用 Agent 模板接口时，对应的私网 origin 是 `http://huahuo-agent:4111`。
@@ -37,14 +37,17 @@ Agent Pod 带 `huahuo.io/api-trusted=true`，符合现有 Server K3s 模板的 A
 
 | GitHub 位置 | 所需配置 |
 | --- | --- |
-| 仓库变量 | `AGENT_IMAGE_REPOSITORY`（完整 ACR 地址/命名空间/仓库），`AGENT_IMAGE_PLATFORM`（可选，默认 `linux/amd64`），`AGENT_ACR_BUILD_RUNNER` 和 `AGENT_K8S_RUNNER`（可选已有 runner 标签） |
-| 仓库 Secrets | `AGENT_REGISTRY_USERNAME` 和 `AGENT_REGISTRY_PASSWORD`（ACR 镜像推送专用凭据） |
+| 仓库变量 | `AGENT_IMAGE_REPOSITORY`（完整 ACR 地址/命名空间/仓库） |
+| `test` Environment 变量 | `AGENT_BUILD_SSH_TARGET`（测试构建机的 `user@host` 或 `ssh://user@host:port`） |
+| `test` Environment Secrets | `AGENT_REGISTRY_USERNAME` 和 `AGENT_REGISTRY_PASSWORD`（ACR 镜像推送专用凭据），`AGENT_BUILD_SSH_KEY`（构建专用 SSH 私钥），`AGENT_BUILD_SSH_KNOWN_HOSTS`（经可信入口核验的构建机 `known_hosts` 记录） |
 | `test` 和 `production` Environment 变量 | `AGENT_K8S_CONTEXT` 与 `AGENT_K8S_NAMESPACE` |
 | `test` 和 `production` Environment Secret | `AGENT_KUBECONFIG`（已授权、有效期内的完整 kubeconfig） |
 
 北京 ACR 专有网络地址为 `huahuoai-docker-hub-registry-vpc.cn-beijing.cr.aliyuncs.com`。将 `AGENT_IMAGE_REPOSITORY` 设置为 `huahuoai-docker-hub-registry-vpc.cn-beijing.cr.aliyuncs.com/<acr-namespace>/<agent-repository>`，用实际的 ACR 命名空间和 Agent 仓库名替换占位符。ACR 命名空间和 Kubernetes namespace 分别配置。
 
-用 `AGENT_ACR_BUILD_RUNNER` 选择能解析并访问该 VPC 地址的现有 runner，CPU 架构应与 `AGENT_IMAGE_PLATFORM` 一致。测试与生产的 Kubernetes 节点也需要能访问该地址以拉取镜像。Kubernetes API 走私网时，用 `AGENT_K8S_RUNNER` 选择可达且获授权的 runner。也可在可达机器用已有授权 kubeconfig 部署已验摘要。部署身份需要应用清单、监视 rollout 和执行 Pod 冒烟所需权限。 [ACR VPC 访问](https://www.alibabacloud.com/help/en/acr/user-guide/configure-access-over-vpcs) · [ACR 推送凭据](https://www.alibabacloud.com/help/en/acr/user-guide/configure-access-credentials) · [ACK kubeconfig](https://www.alibabacloud.com/help/en/ack/ack-managed-and-ack-dedicated/user-guide/kubeconfig-operation-guide/) · [Kubernetes RBAC 实践](https://kubernetes.io/docs/concepts/security/rbac-good-practices/)
+仅允许受保护的 `main` 使用发布 Environment。GitHub 发布任务通过已有 SSH 入口调用云上测试机，使用专用构建账户、密钥和经核验的 SSH 主机公钥。构建机需要 Bash、`tar`、`jq`、本机 Linux ARM64 Docker 和 Buildx，以及访问构建依赖与 ACR VPC 地址的网络。工作流发送已验证 SHA 的 Git 源码归档，测试机原生构建并返回镜像摘要。构建凭据和源码在每次任务的私有临时目录中处理，退出时清理。 [GitHub 环境的分支限制](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments#deployment-branches-and-tags) · [OpenSSH 主机校验](https://man.openbsd.org/ssh_config) · [Git 归档](https://git-scm.com/docs/git-archive) · [ACR VPC 访问](https://www.alibabacloud.com/help/en/acr/user-guide/configure-access-over-vpcs)
+
+测试与生产的 Pod 只调度到 Linux ARM64 节点，节点需要能访问 ACR VPC 地址以拉取镜像。自动部署要求 GitHub 托管 runner 能通过已有授权路径访问 Kubernetes API。API 仅在私网可达时，可在能访问该 API 的机器使用以下命令部署已验摘要。部署身份需要应用清单、监视 rollout 和执行 Pod 冒烟所需权限。 [ACK kubeconfig](https://www.alibabacloud.com/help/en/ack/ack-managed-and-ack-dedicated/user-guide/kubeconfig-operation-guide/) · [Kubernetes RBAC 实践](https://kubernetes.io/docs/concepts/security/rbac-good-practices/)
 
 ```bash
 KUBECONFIG=/path/to/approved-kubeconfig \
@@ -85,4 +88,4 @@ KUBECONFIG="$local_kubeconfig" k3d cluster delete huahuo-agent-local
 rm -f -- "$local_kubeconfig"
 ```
 
-本地 overlay 只运行一个 API-only Pod，内存存储，请求 50m CPU 和 192 MiB 内存。无线上 Secret 或数据库，禁用指标和外连。镜像通过本机导入，Pod 不访问镜像仓库。 [k3d 单节点参数](https://k3d.io/stable/usage/commands/k3d_cluster_create/)
+本地 overlay 跟随开发机架构，只运行一个 API-only Pod，内存存储，请求 50m CPU 和 192 MiB 内存。无线上 Secret 或数据库，禁用指标和外连。镜像通过本机导入，Pod 不访问镜像仓库。 [k3d 单节点参数](https://k3d.io/stable/usage/commands/k3d_cluster_create/)

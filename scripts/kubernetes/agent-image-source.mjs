@@ -7,10 +7,6 @@ const sha = /^[a-f0-9]{40}$/u;
 const hostLabel = '[a-z0-9](?:[a-z0-9-]*[a-z0-9])?';
 const registryPattern = new RegExp(`^${hostLabel}(?:\\.${hostLabel})*(?::[1-9][0-9]{0,4})?$`, 'u');
 const imageComponent = /^[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*$/u;
-const nativeRunners = new Map([
-  ['linux/amd64', 'ubuntu-24.04'],
-  ['linux/arm64', 'ubuntu-24.04-arm'],
-]);
 
 export async function resolveAgentImageSource(env = process.env, fetchImpl = fetch) {
   const sourceSha = env.AGENT_IMAGE_SOURCE_SHA ?? '';
@@ -27,12 +23,6 @@ export async function resolveAgentImageSource(env = process.env, fetchImpl = fet
     || path.some(part => !imageComponent.test(part)) || Number(registry.split(':')[1]) > 65535) {
     throw Error('AGENT_IMAGE_REPOSITORY_INVALID');
   }
-  const platform = env.AGENT_IMAGE_PLATFORM || 'linux/amd64';
-  const nativeRunner = nativeRunners.get(platform);
-  if (!nativeRunner) throw Error('AGENT_IMAGE_PLATFORM_INVALID');
-  const runner = env.AGENT_ACR_BUILD_RUNNER || nativeRunner;
-  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/u.test(runner)) throw Error('AGENT_ACR_BUILD_RUNNER_INVALID');
-
   const token = env.GH_TOKEN;
   if (!token || /[\r\n]/u.test(token)) throw Error('AGENT_IMAGE_SOURCE_NOT_VERIFIED');
   const read = async path => {
@@ -57,7 +47,7 @@ export async function resolveAgentImageSource(env = process.env, fetchImpl = fet
     throw Error('AGENT_IMAGE_SOURCE_NOT_VERIFIED');
   }
 
-  return { source_sha: sourceSha, image_repository: imageRepository, registry, platform, runner };
+  return { source_sha: sourceSha, image_repository: imageRepository };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
@@ -65,9 +55,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     const candidate = await resolveAgentImageSource();
     await appendFile(process.env.GITHUB_OUTPUT, Object.entries(candidate).map(([key, value]) => `${key}=${value}\n`).join(''));
   } catch (error) {
-    const code = error?.message;
-    console.error(['AGENT_IMAGE_REPOSITORY_INVALID', 'AGENT_IMAGE_PLATFORM_INVALID', 'AGENT_ACR_BUILD_RUNNER_INVALID'].includes(code)
-      ? code : 'AGENT_IMAGE_SOURCE_NOT_VERIFIED');
+    console.error(error?.message === 'AGENT_IMAGE_REPOSITORY_INVALID'
+      ? error.message : 'AGENT_IMAGE_SOURCE_NOT_VERIFIED');
     process.exitCode = 1;
   }
 }

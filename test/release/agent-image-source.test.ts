@@ -34,25 +34,12 @@ function github({ head = source, protectedBranch = true, event = 'push', conclus
 }
 
 describe('Agent image source verification', () => {
-  it('selects the checked protected test SHA and the native runner for the requested platform', async () => {
-    const verified = await resolveAgentImageSource({ ...env, AGENT_IMAGE_PLATFORM: 'linux/arm64' }, github());
+  it('selects the checked protected test SHA and configured ACR repository', async () => {
+    const verified = await resolveAgentImageSource(env, github());
     expect(verified).toEqual({
       source_sha: source,
       image_repository: env.AGENT_IMAGE_REPOSITORY,
-      registry: 'registry.example.com:5443',
-      platform: 'linux/arm64',
-      runner: 'ubuntu-24.04-arm',
     });
-    await expect(resolveAgentImageSource(env, github())).resolves.toMatchObject({
-      platform: 'linux/amd64',
-      runner: 'ubuntu-24.04',
-    });
-  });
-
-  it('selects a configured VPC runner for ACR without changing the target platform', async () => {
-    await expect(resolveAgentImageSource({
-      ...env, AGENT_ACR_BUILD_RUNNER: 'acr-vpc-arm64', AGENT_IMAGE_PLATFORM: 'linux/arm64',
-    }, github())).resolves.toMatchObject({ runner: 'acr-vpc-arm64', platform: 'linux/arm64' });
   });
 
   it.each([
@@ -71,8 +58,6 @@ describe('Agent image source verification', () => {
     { AGENT_IMAGE_REPOSITORY: 'https://registry.example.com/agent' },
     { AGENT_IMAGE_REPOSITORY: 'registry.example.com/agent:latest' },
     { AGENT_IMAGE_REPOSITORY: 'huahuo/agent' },
-    { AGENT_IMAGE_PLATFORM: 'linux/386' },
-    { AGENT_ACR_BUILD_RUNNER: 'acr-vpc\nsource_sha=other' },
   ])('rejects invalid dispatch configuration before requesting source (%j)', async (invalid) => {
     const request = github();
     await expect(resolveAgentImageSource({ ...env, ...invalid }, request)).rejects.toThrow();

@@ -70,15 +70,95 @@ jobs:
   publish-test:
     needs: validate-input
     if: inputs.target == 'test'
+    runs-on: ubuntu-24.04
+    environment:
+      name: test
+      deployment: false
+    timeout-minutes: 30
     permissions:
       contents: read
       actions: read
-    uses: ./.github/workflows/agent-image.yml
-    with:
-      source_sha: ${{ inputs.source_sha }}
-    secrets:
-      AGENT_REGISTRY_USERNAME: ${{ secrets.AGENT_REGISTRY_USERNAME }}
-      AGENT_REGISTRY_PASSWORD: ${{ secrets.AGENT_REGISTRY_PASSWORD }}
+    outputs:
+      image_digest: ${{ steps.publish.outputs.image_digest }}
+    steps:
+      - name: Checkout trusted main build script
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26.11.0'
+          package-manager-cache: false
+      - name: Verify the exact tested source and image configuration
+        id: candidate
+        shell: bash
+        env:
+          AGENT_IMAGE_SOURCE_SHA: ${{ inputs.source_sha }}
+          AGENT_IMAGE_REPOSITORY: ${{ needs.validate-input.outputs.image_repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          node scripts/kubernetes/agent-image-source.mjs
+      - name: Checkout verified Agent source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.candidate.outputs.source_sha }}
+          path: verified-source
+          persist-credentials: false
+      - name: Build and push from the cloud test machine
+        id: publish
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ steps.candidate.outputs.source_sha }}
+          IMAGE_REPOSITORY: ${{ steps.candidate.outputs.image_repository }}
+          BUILD_TARGET: ${{ vars.AGENT_BUILD_SSH_TARGET }}
+          BUILD_KEY: ${{ secrets.AGENT_BUILD_SSH_KEY }}
+          BUILD_KNOWN_HOSTS: ${{ secrets.AGENT_BUILD_SSH_KNOWN_HOSTS }}
+          REGISTRY_USERNAME: ${{ secrets.AGENT_REGISTRY_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.AGENT_REGISTRY_PASSWORD }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C verified-source rev-parse HEAD)" = "$SOURCE_SHA"
+          : "${BUILD_TARGET:?Configure AGENT_BUILD_SSH_TARGET}"
+          : "${BUILD_KEY:?Configure AGENT_BUILD_SSH_KEY}"
+          : "${BUILD_KNOWN_HOSTS:?Configure AGENT_BUILD_SSH_KNOWN_HOSTS}"
+          : "${REGISTRY_USERNAME:?Configure AGENT_REGISTRY_USERNAME}"
+          : "${REGISTRY_PASSWORD:?Configure AGENT_REGISTRY_PASSWORD}"
+          umask 077
+          scratch=$(mktemp -d "$RUNNER_TEMP/agent-image.XXXXXX")
+          trap 'rm -rf -- "$scratch"' EXIT
+          printf '%s\n' "$BUILD_KEY" > "$scratch/ssh-key"
+          printf '%s\n' "$BUILD_KNOWN_HOSTS" > "$scratch/known-hosts"
+          printf '%s' "$REGISTRY_USERNAME" > "$scratch/registry-username"
+          printf '%s' "$REGISTRY_PASSWORD" > "$scratch/registry-password"
+          unset BUILD_KEY BUILD_KNOWN_HOSTS REGISTRY_USERNAME REGISTRY_PASSWORD
+          printf '%s\n' "$SOURCE_SHA" > "$scratch/source-sha"
+          printf '%s\n' "$IMAGE_REPOSITORY" > "$scratch/image-repository"
+          git -C verified-source archive --format=tar.gz --output="$scratch/source.tar.gz" "$SOURCE_SHA"
+          cp scripts/kubernetes/build-agent-image.sh "$scratch/build-agent-image.sh"
+
+          remote_script=$(cat <<'REMOTE'
+          set -eu
+          umask 077
+          work=$(mktemp -d)
+          trap 'rm -rf -- "$work"' EXIT
+          tar -xf - -C "$work"
+          bash "$work/build-agent-image.sh" "$work"
+          REMOTE
+          )
+          digest=$(tar -C "$scratch" -cf - build-agent-image.sh source.tar.gz source-sha image-repository registry-username registry-password |
+            ssh -F /dev/null -T -o BatchMode=yes -o IdentitiesOnly=yes -o ClearAllForwardings=yes \
+              -o StrictHostKeyChecking=yes -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile="$scratch/known-hosts" \
+              -o ConnectTimeout=15 -o ServerAliveInterval=30 -o ServerAliveCountMax=3 \
+              -i "$scratch/ssh-key" -- "$BUILD_TARGET" "$remote_script")
+          if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            printf '%s\n' AGENT_IMAGE_DIGEST_INVALID >&2
+            exit 1
+          fi
+          printf 'image_digest=%s\n' "$digest" >> "$GITHUB_OUTPUT"
+          printf '## Agent image\n\n- Source commit `%s`\n- Platform `linux/arm64`\n- Image `%s@%s`\n' \
+            "$SOURCE_SHA" "$IMAGE_REPOSITORY" "$digest" >> "$GITHUB_STEP_SUMMARY"
 
   release:
     needs: [validate-input, publish-test]
@@ -89,7 +169,7 @@ jobs:
     permissions:
       contents: read
     environment: ${{ inputs.target }}
-    runs-on: ${{ vars.AGENT_K8S_RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
