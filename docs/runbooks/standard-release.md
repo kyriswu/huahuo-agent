@@ -35,6 +35,8 @@ Agent Pod 带 `huahuo.io/api-trusted=true`，符合现有 Server K3s 模板的 A
 2. 测试部署自动使用这次推送返回的 `sha256:...`。流程先做 Kubernetes 服务端 dry-run，再应用 NetworkPolicy 和工作负载，等待滚动更新，核对容器镜像并验证进程健康和匿名 API 401。记录 Actions 摘要中的源码 SHA、平台和镜像摘要。
 3. 验证测试环境的网关路径、Studio、持久化和业务链路。生产手动选择 `production`，在 `image_digest` 填入同一测试摘要，通过生产环境审批后从 ACR 拉取。生产应用关闭 Studio 页面和资源。
 
+首次接入构建机时可选择 `test` 并勾选 `build_only`，只构建和推送镜像，在 Actions 摘要核对 ARM64 和镜像摘要。构建机一次只跑一个发布构建，BuildKit 容器上限为 1.5 核 CPU 和 3 GiB 内存。构建前，Docker 数据目录与源码临时目录所在文件系统各需至少 25 GiB 空闲。若两者在同一块盘，只需同一份 25 GiB 余量。节点同时承载 Kubernetes 工作负载时，在该构建节点所属节点池将构建预算计入节点预留。 [Buildx 资源限制](https://docs.docker.com/build/builders/drivers/docker-container/) · [ACK 节点资源预留](https://www.alibabacloud.com/help/en/ack/ack-managed-and-ack-dedicated/user-guide/resource-reservation-policy)
+
 | GitHub 位置 | 所需配置 |
 | --- | --- |
 | 仓库变量 | `AGENT_IMAGE_REPOSITORY`（完整 ACR 地址/命名空间/仓库） |

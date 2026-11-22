@@ -16,6 +16,10 @@ on:
         description: Production only. Digest already verified in test (sha256:…)
         type: string
         required: false
+      build_only:
+        description: Test only. Build and push the image without applying Kubernetes resources.
+        type: boolean
+        default: false
 
 permissions: {}
 
@@ -41,6 +45,7 @@ jobs:
           TARGET: ${{ inputs.target }}
           SOURCE_SHA: ${{ inputs.source_sha }}
           IMAGE_DIGEST: ${{ inputs.image_digest }}
+          BUILD_ONLY: ${{ inputs.build_only }}
           IMAGE_REPOSITORY: ${{ vars.AGENT_IMAGE_REPOSITORY }}
         run: |
           case "$TARGET" in
@@ -51,7 +56,7 @@ jobs:
               fi
               ;;
             production)
-              if [[ -n "$SOURCE_SHA" || ! "$IMAGE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+              if [[ "$BUILD_ONLY" == true || -n "$SOURCE_SHA" || ! "$IMAGE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
                 printf '%s\n' AGENT_K8S_PRODUCTION_REQUIRES_VERIFIED_DIGEST_ONLY >&2
                 exit 1
               fi
@@ -179,7 +184,7 @@ jobs:
   release:
     needs: [validate-input, publish-test]
     if: >-
-      !cancelled() && needs.validate-input.result == 'success' &&
+      !cancelled() && !inputs.build_only && needs.validate-input.result == 'success' &&
       ((inputs.target == 'test' && needs.publish-test.result == 'success') ||
        (inputs.target == 'production' && needs.publish-test.result == 'skipped'))
     permissions:
