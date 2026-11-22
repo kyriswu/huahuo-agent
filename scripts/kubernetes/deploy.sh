@@ -59,11 +59,11 @@ kube kustomize "$overlay" > "$stage/rendered.yaml" 2>/dev/null || fail AGENT_K8S
 # Kustomize writes one resource per YAML document. Separate the policy so it
 # reaches the API server before the Service and Deployment are created.
 awk -v policy="$stage/policy.yaml" -v workload="$stage/workload.yaml" \
-    -v image="$image" -v namespace="$namespace" '
+    -v image="$image" -v expected_namespace="$namespace" '
   function emit() {
     if (resource !~ /[^[:space:]]/) return
     expected_name = kind == "NetworkPolicy" ? "huahuo-agent-ingress" : "huahuo-agent"
-    if (name != expected_name || declared_namespace != namespace) invalid = 1
+    if (name != expected_name || declared_namespace != expected_namespace) invalid = 1
     if (kind == "NetworkPolicy") print "---\n" resource > policy
     else if (kind == "Deployment" || kind == "Service" || kind == "ServiceAccount")
       print "---\n" resource > workload
