@@ -106,6 +106,17 @@ jobs:
           ref: ${{ steps.candidate.outputs.source_sha }}
           path: verified-source
           persist-credentials: false
+      - name: Install the pinned Alibaba Cloud CLI
+        shell: bash
+        run: |
+          install -d "$RUNNER_TEMP/aliyun-cli"
+          archive="$RUNNER_TEMP/aliyun-cli/aliyun-cli.tar.gz"
+          curl --fail --silent --show-error --location --max-time 60 --output "$archive" \
+            https://github.com/aliyun/aliyun-cli/releases/download/v3.5.3/aliyun-cli-linux-3.5.3-amd64.tgz
+          printf '%s  %s\n' defcbc01a28c9bbb27706fd53473020175a96886186df176dfa934ab6661fbde "$archive" | sha256sum --check --status
+          tar -xzf "$archive" -C "$RUNNER_TEMP/aliyun-cli" aliyun
+          rm -f -- "$archive"
+          printf '%s\n' "$RUNNER_TEMP/aliyun-cli" >> "$GITHUB_PATH"
       - name: Build and push from the cloud test machine
         id: publish
         shell: bash
@@ -115,24 +126,29 @@ jobs:
           BUILD_TARGET: ${{ vars.AGENT_BUILD_SSH_TARGET }}
           BUILD_KEY: ${{ secrets.AGENT_BUILD_SSH_KEY }}
           BUILD_KNOWN_HOSTS: ${{ secrets.AGENT_BUILD_SSH_KNOWN_HOSTS }}
-          REGISTRY_USERNAME: ${{ secrets.AGENT_REGISTRY_USERNAME }}
-          REGISTRY_PASSWORD: ${{ secrets.AGENT_REGISTRY_PASSWORD }}
+          ACR_INSTANCE_ID: ${{ vars.AGENT_ACR_INSTANCE_ID }}
+          ALIBABA_CLOUD_REGION_ID: ${{ vars.AGENT_ACR_REGION_ID }}
+          ALIBABA_CLOUD_ACCESS_KEY_ID: ${{ secrets.ALIBABA_CLOUD_ACCESS_KEY_ID }}
+          ALIBABA_CLOUD_ACCESS_KEY_SECRET: ${{ secrets.ALIBABA_CLOUD_ACCESS_KEY_SECRET }}
+          ALIBABA_CLOUD_IGNORE_PROFILE: 'TRUE'
+          ALIBABA_CLOUD_CLI_PLUGIN_AUTO_INSTALL: 'false'
         run: |
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           test "$(git -C verified-source rev-parse HEAD)" = "$SOURCE_SHA"
           : "${BUILD_TARGET:?Configure AGENT_BUILD_SSH_TARGET}"
           : "${BUILD_KEY:?Configure AGENT_BUILD_SSH_KEY}"
           : "${BUILD_KNOWN_HOSTS:?Configure AGENT_BUILD_SSH_KNOWN_HOSTS}"
-          : "${REGISTRY_USERNAME:?Configure AGENT_REGISTRY_USERNAME}"
-          : "${REGISTRY_PASSWORD:?Configure AGENT_REGISTRY_PASSWORD}"
+          : "${ALIBABA_CLOUD_ACCESS_KEY_ID:?Configure ALIBABA_CLOUD_ACCESS_KEY_ID}"
+          : "${ALIBABA_CLOUD_ACCESS_KEY_SECRET:?Configure ALIBABA_CLOUD_ACCESS_KEY_SECRET}"
           umask 077
           scratch=$(mktemp -d "$RUNNER_TEMP/agent-image.XXXXXX")
           trap 'rm -rf -- "$scratch"' EXIT
           printf '%s\n' "$BUILD_KEY" > "$scratch/ssh-key"
           printf '%s\n' "$BUILD_KNOWN_HOSTS" > "$scratch/known-hosts"
-          printf '%s' "$REGISTRY_USERNAME" > "$scratch/registry-username"
-          printf '%s' "$REGISTRY_PASSWORD" > "$scratch/registry-password"
-          unset BUILD_KEY BUILD_KNOWN_HOSTS REGISTRY_USERNAME REGISTRY_PASSWORD
+          unset BUILD_KEY BUILD_KNOWN_HOSTS
+          bash scripts/kubernetes/acr-auth.sh "$ALIBABA_CLOUD_REGION_ID" "$ACR_INSTANCE_ID" "$IMAGE_REPOSITORY" "$scratch"
+          unset ALIBABA_CLOUD_ACCESS_KEY_ID ALIBABA_CLOUD_ACCESS_KEY_SECRET
+          printf '::add-mask::%s\n' "$(cat "$scratch/registry-username")" "$(cat "$scratch/registry-password")"
           printf '%s\n' "$SOURCE_SHA" > "$scratch/source-sha"
           printf '%s\n' "$IMAGE_REPOSITORY" > "$scratch/image-repository"
           git -C verified-source archive --format=tar.gz --output="$scratch/source.tar.gz" "$SOURCE_SHA"

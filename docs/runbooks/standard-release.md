@@ -38,12 +38,14 @@ Agent Pod 带 `huahuo.io/api-trusted=true`，符合现有 Server K3s 模板的 A
 | GitHub 位置 | 所需配置 |
 | --- | --- |
 | 仓库变量 | `AGENT_IMAGE_REPOSITORY`（完整 ACR 地址/命名空间/仓库） |
-| `test` Environment 变量 | `AGENT_BUILD_SSH_TARGET`（测试构建机的 `user@host` 或 `ssh://user@host:port`） |
-| `test` Environment Secrets | `AGENT_REGISTRY_USERNAME` 和 `AGENT_REGISTRY_PASSWORD`（ACR 镜像推送专用凭据），`AGENT_BUILD_SSH_KEY`（构建专用 SSH 私钥），`AGENT_BUILD_SSH_KNOWN_HOSTS`（经可信入口核验的构建机 `known_hosts` 记录） |
+| `test` Environment 变量 | `AGENT_ACR_REGION_ID`（当前为 `cn-beijing`）、`AGENT_ACR_INSTANCE_ID`（ACR 企业版实例 ID）、`AGENT_BUILD_SSH_TARGET`（测试构建机的 `user@host` 或 `ssh://user@host:port`） |
+| `test` Environment Secrets | `ALIBABA_CLOUD_ACCESS_KEY_ID` 和 `ALIBABA_CLOUD_ACCESS_KEY_SECRET`（获准查询目标仓库、换取 ACR 令牌和推送 Agent 镜像的 RAM 身份），`AGENT_BUILD_SSH_KEY`（构建专用 SSH 私钥），`AGENT_BUILD_SSH_KNOWN_HOSTS`（经可信入口核验的构建机 `known_hosts` 记录） |
 | `test` 和 `production` Environment 变量 | `AGENT_K8S_CONTEXT` 与 `AGENT_K8S_NAMESPACE` |
 | `test` 和 `production` Environment Secret | `AGENT_KUBECONFIG`（已授权、有效期内的完整 kubeconfig） |
 
 北京 ACR 专有网络地址为 `huahuoai-docker-hub-registry-vpc.cn-beijing.cr.aliyuncs.com`。将 `AGENT_IMAGE_REPOSITORY` 设置为 `huahuoai-docker-hub-registry-vpc.cn-beijing.cr.aliyuncs.com/<acr-namespace>/<agent-repository>`，用实际的 ACR 命名空间和 Agent 仓库名替换占位符。ACR 命名空间和 Kubernetes namespace 分别配置。
+
+构建前先在目标 ACR 命名空间准备状态正常的私有仓库。工作流通过 ACR API 核对仓库，再用 RAM 身份换取一小时的登录凭据。构建机只接收临时 ACR 凭据。应用 `.env` 可以记录非敏感发布参数，GitHub 发布从上述变量和 Secrets 读取配置。 [ACR 获取仓库](https://www.alibabacloud.com/help/en/acr/developer-reference/api-cr-2018-12-01-getrepository) · [ACR 临时凭据](https://www.alibabacloud.com/help/en/acr/developer-reference/api-cr-2018-12-01-getauthorizationtoken)
 
 仅允许受保护的 `main` 使用发布 Environment。GitHub 发布任务通过已有 SSH 入口调用云上测试机，使用专用构建账户、密钥和经核验的 SSH 主机公钥。构建机需要 Bash、`tar`、`jq`、本机 Linux ARM64 Docker 和 Buildx，以及访问构建依赖与 ACR VPC 地址的网络。工作流发送已验证 SHA 的 Git 源码归档，测试机原生构建并返回镜像摘要。构建凭据和源码在每次任务的私有临时目录中处理，退出时清理。 [GitHub 环境的分支限制](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments#deployment-branches-and-tags) · [OpenSSH 主机校验](https://man.openbsd.org/ssh_config) · [Git 归档](https://git-scm.com/docs/git-archive) · [ACR VPC 访问](https://www.alibabacloud.com/help/en/acr/user-guide/configure-access-over-vpcs)
 
