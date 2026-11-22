@@ -2,12 +2,12 @@
 
 跨仓共同规范由 huahuo-server 仓库的 `docs/observability/contract.md`、`metrics.md` 与 `README.md` 维护；本页说明 Agent 的实际接入和验收边界。
 
-应用使用 Mastra 1.83 的原生 Observability 与官方 OtelBridge，和项目的标准 OTel HTTP span 共用同一个 NodeTracerProvider。没有第二套模型调用器、观测持久表、默认平台 exporter 或全局 HTTP/数据库自动插桩。
+应用使用 Mastra 的原生 Observability 与官方 OtelBridge，和项目的标准 OTel HTTP span 共用同一个 NodeTracerProvider。没有第二套模型调用器、观测持久表、默认平台 exporter 或全局 HTTP/数据库自动插桩。
 
 ## 启动与配置
 
 - `METRICS_ENABLED=true`、`METRICS_HOST=127.0.0.1`、`METRICS_PORT=9464`：独立监听器仅提供 `GET /metrics`。容器可显式监听 `0.0.0.0`，宿主映射应限制在回环或管理网络。它不经过业务身份认证，不接入公开反向代理。
-- Compose 固定容器监听 `0.0.0.0:9464`，通过 `METRICS_BIND_HOST=127.0.0.1`、`METRICS_HOST_PORT=9469` 映射到宿主回环；本期发布断言拒绝公开绑定。端口冲突由 Compose 启动失败及原有同锁恢复处理，不操作其他服务释放端口。
+- Kubernetes 在线 Pod 监听 `0.0.0.0:9464`，由 NetworkPolicy 限制采集来源。轻量本地 Kubernetes 禁用指标。本地 Compose 默认把指标映射到宿主回环。
 - `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`：空值时没有外部 trace 网络导出；配置完整 HTTP OTLP `/v1/traces` 地址才启用。有界队列 512、批次 64、1 秒调度、2 秒导出超时；不读取任意 `OTEL_RESOURCE_ATTRIBUTES`，不自动采用通用 OTLP endpoint 开启导出。
 - `OTEL_SERVICE_VERSION` 默认 `package.json.version`；`OTEL_SERVICE_INSTANCE_ID` 默认进程 UUID，显式非法值拒绝启动。`APP_ENV=production` 归一化为 env=`prod`，development/test 保持原值；service=`huahuo-agent`、role=`agent` 与 version/instance 一同写入 JSON 日志和 OTel resource。
 - `LOG_LEVEL=info`，支持 debug/info/warn/error。框架自由文本统一为 `mastra.event`，异常事件 `exception` 保留 err.type、有限安全 code 和最多六条栈帧，只留受控模块名和行列，删除 message 首行、函数名、绝对路径、URL。仅接受 data property 或 Node 内置安全 stack accessor，跳过用户自定义 getter；不输出原始异常消息、请求正文或提供商响应。
@@ -48,12 +48,4 @@ Mastra span output processor 在 started/updated/ended 三种事件上均原地�
 
 `pnpm typecheck`、`pnpm test`。`test/observability.test.ts` 使用随机回环端口验证真实 /metrics、端口冲突拒绝、关闭、无 endpoint 不受通用 OTLP ENV 触发、真实假 OTLP receiver 的序列化载荷、W3C HTTP→官方 native bridge→Server client 父子关系、完整 body timeout/cancel、SSE reader 终态与原生运行分离、首文本透传和实际 mock provider/tool/run 链。输入/输出/工具/URL/token canary 不得出现在 OTLP wire payload 或 JSON 日志。测试不访问模型、短信、真实 DB 或真实业务日志；这些证据不等于测试服务器或真实提供商已联调，更不授予发布许可。
 
-2026-11-17 本轮本地证据：Node 26.11.0 / pnpm 10.15.1，typecheck 通过，全量 29 文件 354 测试通过（含本轮 10 项观测测试），`git diff --check` 通过；严格 peer 校验通过，源码与打包依赖的 OTel API 固定 1.9.0。`pnpm build` 在禁用 dotenv、数据库密码为空、模型凭据为 fixture、无外部 OTLP endpoint 的隔离 ENV 下成功；未启动真实 Agent 服务或执行发布。
-
-## 本期发布准备
-
-计划 `20261117-observability` 以测试环境真实成功 `8336740de0b4bf7b18f21e9e2f8d39b3e10f7d4b` 为基准（[44029941351](https://github.com/kyriswu/huahuo-agent/actions/runs/44029941351)，五阶段 5/5、TEST_RELEASE_OK）。纳入本仓库当前全部未提交的观测代码、测试、依赖、Compose 与文档；main 的同步差异另含已经在 test 发布的 Studio 与 Server Client 改动，不代表新增其他项目发布。
-
-新增九项可选 ENV 的默认值见上文及 `.env.example`；没有既有值修改、秘密准备或必填新键，使用上一成功快照 `reuse`。本期本地配置断言 `scripts/release/changes/20261117-observability/verify-config.mjs` 验证默认/现值、回环绑定与外部 trace 导出关闭；默认通过，公开 metrics、外部导出和非法端口反例拒绝通过。脚本只断言 ENV，不访问网络/数据库或输出配置值。宿主端口是否空闲仍由本次实际启动检验，不把本地测试冒充目标端口检查。
-
-依赖和 Compose 先通过 main 的 PR 与严格 CI，再经 PR 同步 test；测试发布仍由受保护 main 使用准确 test push CI 执行。没有包升级造成的 Mastra 存储结构变化、额外 SQL 或回填；框架既有启动存储初始化仍会发生，应用恢复不撤销已提交变化。目标发布结果以新 Actions 和宿主成功记录为准。
+部署及采集端接入见 [Kubernetes 发布](standard-release.md)。

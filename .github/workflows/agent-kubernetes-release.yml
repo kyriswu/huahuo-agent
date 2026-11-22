@@ -1,0 +1,225 @@
+name: Agent Kubernetes release
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Kubernetes environment
+        type: choice
+        options: [test, production]
+        required: true
+      source_sha:
+        description: Test only. Full current test SHA with successful Agent CI.
+        type: string
+        required: false
+      image_digest:
+        description: Production only. Digest already verified in test (sha256:…)
+        type: string
+        required: false
+      build_only:
+        description: Test only. Build and push the image without applying Kubernetes resources.
+        type: boolean
+        default: false
+
+permissions: {}
+
+concurrency:
+  group: huahuo-agent-kubernetes-${{ inputs.target }}
+  cancel-in-progress: false
+
+jobs:
+  validate-input:
+    if: >-
+      github.repository == 'kyriswu/huahuo-agent' &&
+      github.ref == 'refs/heads/main' && github.ref_protected &&
+      github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      image_repository: ${{ steps.inputs.outputs.image_repository }}
+    steps:
+      - name: Validate the release input for the selected environment
+        id: inputs
+        shell: bash
+        env:
+          TARGET: ${{ inputs.target }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          IMAGE_DIGEST: ${{ inputs.image_digest }}
+          BUILD_ONLY: ${{ inputs.build_only }}
+          IMAGE_REPOSITORY: ${{ vars.AGENT_IMAGE_REPOSITORY }}
+        run: |
+          case "$TARGET" in
+            test)
+              if [[ ! "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ || -n "$IMAGE_DIGEST" ]]; then
+                printf '%s\n' AGENT_K8S_TEST_REQUIRES_SOURCE_SHA_ONLY >&2
+                exit 1
+              fi
+              ;;
+            production)
+              if [[ "$BUILD_ONLY" == true || -n "$SOURCE_SHA" || ! "$IMAGE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+                printf '%s\n' AGENT_K8S_PRODUCTION_REQUIRES_VERIFIED_DIGEST_ONLY >&2
+                exit 1
+              fi
+              ;;
+            *)
+              printf '%s\n' AGENT_K8S_TARGET_INVALID >&2
+              exit 1
+              ;;
+          esac
+          if [[ ! "$IMAGE_REPOSITORY" =~ ^[a-z0-9][a-z0-9.-]*(:[0-9]{1,5})?(/[a-z0-9][a-z0-9._-]*)+$ ]]; then
+            printf '%s\n' AGENT_IMAGE_REPOSITORY_INVALID >&2
+            exit 1
+          fi
+          printf 'image_repository=%s\n' "$IMAGE_REPOSITORY" >> "$GITHUB_OUTPUT"
+
+  publish-test:
+    needs: validate-input
+    if: inputs.target == 'test'
+    runs-on: ubuntu-24.04
+    environment:
+      name: test
+      deployment: false
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      image_digest: ${{ steps.publish.outputs.image_digest }}
+    steps:
+      - name: Checkout trusted main build script
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26.11.0'
+          package-manager-cache: false
+      - name: Verify the exact tested source and image configuration
+        id: candidate
+        shell: bash
+        env:
+          AGENT_IMAGE_SOURCE_SHA: ${{ inputs.source_sha }}
+          AGENT_IMAGE_REPOSITORY: ${{ needs.validate-input.outputs.image_repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          node scripts/kubernetes/agent-image-source.mjs
+      - name: Checkout verified Agent source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.candidate.outputs.source_sha }}
+          path: verified-source
+          persist-credentials: false
+      - name: Install the pinned Alibaba Cloud CLI
+        shell: bash
+        run: |
+          install -d "$RUNNER_TEMP/aliyun-cli"
+          archive="$RUNNER_TEMP/aliyun-cli/aliyun-cli.tar.gz"
+          curl --fail --silent --show-error --location --max-time 60 --output "$archive" \
+            https://github.com/aliyun/aliyun-cli/releases/download/v3.5.3/aliyun-cli-linux-3.5.3-amd64.tgz
+          printf '%s  %s\n' defcbc01a28c9bbb27706fd53473020175a96886186df176dfa934ab6661fbde "$archive" | sha256sum --check --status
+          tar -xzf "$archive" -C "$RUNNER_TEMP/aliyun-cli" aliyun
+          rm -f -- "$archive"
+          printf '%s\n' "$RUNNER_TEMP/aliyun-cli" >> "$GITHUB_PATH"
+      - name: Build and push from the cloud test machine
+        id: publish
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ steps.candidate.outputs.source_sha }}
+          IMAGE_REPOSITORY: ${{ steps.candidate.outputs.image_repository }}
+          BUILD_TARGET: ${{ vars.AGENT_BUILD_SSH_TARGET }}
+          BUILD_KEY: ${{ secrets.AGENT_BUILD_SSH_KEY }}
+          BUILD_KNOWN_HOSTS: ${{ secrets.AGENT_BUILD_SSH_KNOWN_HOSTS }}
+          ACR_INSTANCE_ID: ${{ vars.AGENT_ACR_INSTANCE_ID }}
+          ALIBABA_CLOUD_REGION_ID: ${{ vars.AGENT_ACR_REGION_ID }}
+          ALIBABA_CLOUD_ACCESS_KEY_ID: ${{ secrets.ALIBABA_CLOUD_ACCESS_KEY_ID }}
+          ALIBABA_CLOUD_ACCESS_KEY_SECRET: ${{ secrets.ALIBABA_CLOUD_ACCESS_KEY_SECRET }}
+          ALIBABA_CLOUD_IGNORE_PROFILE: 'TRUE'
+          ALIBABA_CLOUD_CLI_PLUGIN_AUTO_INSTALL: 'false'
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C verified-source rev-parse HEAD)" = "$SOURCE_SHA"
+          : "${BUILD_TARGET:?Configure AGENT_BUILD_SSH_TARGET}"
+          : "${BUILD_KEY:?Configure AGENT_BUILD_SSH_KEY}"
+          : "${BUILD_KNOWN_HOSTS:?Configure AGENT_BUILD_SSH_KNOWN_HOSTS}"
+          : "${ALIBABA_CLOUD_ACCESS_KEY_ID:?Configure ALIBABA_CLOUD_ACCESS_KEY_ID}"
+          : "${ALIBABA_CLOUD_ACCESS_KEY_SECRET:?Configure ALIBABA_CLOUD_ACCESS_KEY_SECRET}"
+          umask 077
+          scratch=$(mktemp -d "$RUNNER_TEMP/agent-image.XXXXXX")
+          trap 'rm -rf -- "$scratch"' EXIT
+          printf '%s\n' "$BUILD_KEY" > "$scratch/ssh-key"
+          printf '%s\n' "$BUILD_KNOWN_HOSTS" > "$scratch/known-hosts"
+          unset BUILD_KEY BUILD_KNOWN_HOSTS
+          bash scripts/kubernetes/acr-auth.sh "$ALIBABA_CLOUD_REGION_ID" "$ACR_INSTANCE_ID" "$IMAGE_REPOSITORY" "$scratch"
+          unset ALIBABA_CLOUD_ACCESS_KEY_ID ALIBABA_CLOUD_ACCESS_KEY_SECRET
+          printf '::add-mask::%s\n' "$(cat "$scratch/registry-username")" "$(cat "$scratch/registry-password")"
+          printf '%s\n' "$SOURCE_SHA" > "$scratch/source-sha"
+          printf '%s\n' "$IMAGE_REPOSITORY" > "$scratch/image-repository"
+          git -C verified-source archive --format=tar.gz --output="$scratch/source.tar.gz" "$SOURCE_SHA"
+          cp scripts/kubernetes/build-agent-image.sh "$scratch/build-agent-image.sh"
+
+          remote_script=$(cat <<'REMOTE'
+          set -eu
+          umask 077
+          work=$(mktemp -d)
+          trap 'rm -rf -- "$work"' EXIT
+          tar -xf - -C "$work"
+          bash "$work/build-agent-image.sh" "$work"
+          REMOTE
+          )
+          digest=$(tar -C "$scratch" -cf - build-agent-image.sh source.tar.gz source-sha image-repository registry-username registry-password |
+            ssh -F /dev/null -T -o BatchMode=yes -o IdentitiesOnly=yes -o ClearAllForwardings=yes \
+              -o StrictHostKeyChecking=yes -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile="$scratch/known-hosts" \
+              -o ConnectTimeout=15 -o ServerAliveInterval=30 -o ServerAliveCountMax=3 \
+              -i "$scratch/ssh-key" -- "$BUILD_TARGET" "$remote_script")
+          if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            printf '%s\n' AGENT_IMAGE_DIGEST_INVALID >&2
+            exit 1
+          fi
+          printf 'image_digest=%s\n' "$digest" >> "$GITHUB_OUTPUT"
+          printf '## Agent image\n\n- Source commit `%s`\n- Platform `linux/arm64`\n- Image `%s@%s`\n' \
+            "$SOURCE_SHA" "$IMAGE_REPOSITORY" "$digest" >> "$GITHUB_STEP_SUMMARY"
+
+  release:
+    needs: [validate-input, publish-test]
+    if: >-
+      !cancelled() && !inputs.build_only && needs.validate-input.result == 'success' &&
+      ((inputs.target == 'test' && needs.publish-test.result == 'success') ||
+       (inputs.target == 'production' && needs.publish-test.result == 'skipped'))
+    permissions:
+      contents: read
+    environment: ${{ inputs.target }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Verify trusted main control revision
+        run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - name: Apply the verified image digest and smoke Agent
+        shell: bash
+        env:
+          AGENT_K8S_TARGET: ${{ inputs.target }}
+          AGENT_IMAGE_DIGEST: ${{ inputs.target == 'test' && needs.publish-test.outputs.image_digest || inputs.image_digest }}
+          AGENT_IMAGE_REPOSITORY: ${{ needs.validate-input.outputs.image_repository }}
+          AGENT_K8S_CONTEXT: ${{ vars.AGENT_K8S_CONTEXT }}
+          AGENT_K8S_NAMESPACE: ${{ vars.AGENT_K8S_NAMESPACE }}
+          AGENT_KUBECONFIG: ${{ secrets.AGENT_KUBECONFIG }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$AGENT_KUBECONFIG" ]]; then
+            printf '%s\n' AGENT_K8S_KUBECONFIG_REQUIRED >&2
+            exit 1
+          fi
+          umask 077
+          kubeconfig=$(mktemp "$RUNNER_TEMP/huahuo-agent-kubeconfig.XXXXXX")
+          trap 'rm -f -- "$kubeconfig"' EXIT
+          printf '%s\n' "$AGENT_KUBECONFIG" > "$kubeconfig"
+          chmod 0600 "$kubeconfig"
+          unset AGENT_KUBECONFIG
+          KUBECONFIG="$kubeconfig" scripts/kubernetes/deploy.sh "$AGENT_K8S_TARGET" "$AGENT_IMAGE_DIGEST"
+          printf '## Agent Kubernetes release\n\n- Environment `%s`\n- Image `%s@%s`\n' \
+            "$AGENT_K8S_TARGET" "$AGENT_IMAGE_REPOSITORY" "$AGENT_IMAGE_DIGEST" >> "$GITHUB_STEP_SUMMARY"

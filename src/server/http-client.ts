@@ -1,20 +1,19 @@
-import type { RequestContext } from '@mastra/core/request-context';
 import { z } from 'zod';
-import { getTrustedIdentity, trustedIdentityHeaders } from '../auth/trusted-identity.js';
+import { readTrustedIdentity, trustedIdentityHeaders, type TrustedHuahuoIdentity } from '../auth/trusted-identity.js';
 import { traceHeaders, validTraceId } from '../trace.js';
 import { resolveHuahuoServerBaseUrl } from './base-url.js';
 import { context, propagation, trace, SpanKind, SpanStatusCode } from '@opentelemetry/api';
 import { agentMetrics, observeSafely, serverOperation, type AgentMetrics, type ClientOutcome } from '../observability/metrics.js';
-import {logger} from '../logging.js';
 
 export interface ServerHttpClientOptions {
   baseUrl?: string;
   fetchImpl?: typeof fetch;
   metrics?: AgentMetrics;
+  logger?: { info(message: string, fields: Record<string, unknown>): void };
 }
 
 export interface ServerRequestOptions {
-  requestContext?: RequestContext;
+  identity?: TrustedHuahuoIdentity;
   signal?: AbortSignal;
   timeoutMs?: number;
   /** Only unauthenticated login/SMS endpoints opt out of trusted identity. */
@@ -61,7 +60,9 @@ export class ServerHttpClient {
     if (!/^\/(?!\/)[A-Za-z0-9/_-]+$/u.test(path)) throw new Error('SERVER_REQUEST_PATH_INVALID');
     const headers = traceHeaders({ 'content-type': 'application/json' });
     if (options.authentication !== 'none') {
-      for (const [name, value] of Object.entries(trustedIdentityHeaders(getTrustedIdentity(options.requestContext)))) {
+      if (!options.identity) throw new Error('TRUSTED_IDENTITY_REQUIRED');
+      const identity = readTrustedIdentity(trustedIdentityHeaders(options.identity));
+      for (const [name, value] of Object.entries(trustedIdentityHeaders(identity))) {
         headers.set(name, value);
       }
     }
@@ -136,7 +137,7 @@ export class ServerHttpClient {
         span.setAttribute('outcome', outcome);
         if (status !== undefined) span.setAttribute('http.response.status_code', status);
         if (outcome !== 'success') span.setStatus({ code: SpanStatusCode.ERROR });
-        logger.info('http.client.completed', {...labels,statusCode:status??'none',durationMs:performance.now()-started});
+        this.options.logger?.info('http.client.completed', { ...labels, statusCode: status ?? 'none', durationMs: performance.now() - started });
       });
       span.end();
     }

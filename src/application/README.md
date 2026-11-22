@@ -1,5 +1,5 @@
 # Application boundary
 
-Application use cases live here. `rag/search-knowledge.ts` coordinates
-keyword, semantic, or hybrid provider search and an optional reranker without
-depending on a concrete vector backend.
+The standalone RAG indexing tools use these application services for document
+parsing, Markdown chunking, ingestion, and index version management. HuoX queries
+the Server RAG API through [the Server client](../server/README.md).

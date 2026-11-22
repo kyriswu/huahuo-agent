@@ -1,68 +1,95 @@
-# Agent 标准发布
+# 花火 Agent Kubernetes 发布
 
-本仓库使用与 huahuo-server 相同的 Git 发布机制，运行目标为同一台已授权测试机的 `/root/huahuo-agent`。Agent 使用独立 Compose 项目、镜像、宿主锁、状态目录、RAM 角色和云助手命令，不能复用 Server 的固定发布命令。Nginx、域名和证书由宿主管理。
+线上使用阿里云 ACR 和 Kubernetes。手动触发测试发布时，流程先推送镜像到 ACR，再按返回的摘要更新 Deployment。生产复用已验收的同一摘要。代码合并只运行 CI。
 
-main 的控制流程接受准确 test push CI 的 workflow_run；手动 dispatch 保留作恢复。先验证仓库、事件、CI 路径、运行 ID、当前双 SHA 和合并 PR 的完整文件清单，再取得 OIDC 短期身份。main/test 移动、文件清单不完整或业务变更缺计划均失败；不运行 test 的 runner 控制脚本、不消费不可信缓存/产物。发布串行且不取消在途发布，只调用一次云命令。
+## 接入已有集群
 
-代码验收与部署许可分开：CI 使用 `release:review`，核对干净提交、计划结构、兼容判断类型、基准祖先、冻结迁移和审查文件；兼容项为 `false` 的候选仍可完成测试与构建。普通发布继续要求 `release:check` 和宿主门禁全部通过，不把代码 CI 成功等同于允许更新。
+1. 确认目标 context、namespace、可调度的 Linux ARM64 节点、镜像仓库与部署端到 Kubernetes API 的网络路径。测试和生产分别使用各自的授权与配置。Namespace 由集群运维创建。
+2. 在目标 namespace 准备 `huahuo-agent-config` ConfigMap 和 `huahuo-agent-secrets` Secret。Agent 使用独立的持久化 PostgreSQL 数据库。测试和生产各用已确认的目标库。
+3. 配置集群拉取私有 ACR 镜像的权限。有现成 ACK 免密拉取配置时可沿用，其他集群可在 Agent 的 ServiceAccount 上挂接预置的 imagePullSecret。应用 Pod 不挂载 Kubernetes API token。 [ACR 私有镜像拉取](https://www.alibabacloud.com/help/en/acr/user-guide/non-secret-pulling-container-image)
+4. 核对网关和 Server 的私网流向。Agent 与 Server 在同一 namespace 时可以使用 `http://huahuo-api:3000` 作为 Server origin。Server 需要调用 Agent 模板接口时，对应的私网 origin 是 `http://huahuo-agent:4111`。
 
-自动入口先只读准确 test SHA 的计划 JSON，兼容项为 `false` 时报告 `deferred`，不取得云凭据或调用发布命令；非法或缺失计划仍失败。手动普通发布同样不能跳过兼容门禁。本项目所需的首次维护另行准备，不向自动路径添加临时兼容分支。上述控制修改需经 main 审核合入再同步 test，本地文件变化不代表线上流程已更新。
+### 运行配置
 
-## 计划和配置
+| 放置位置 | 键 | 说明 |
+| --- | --- | --- |
+| ConfigMap | `HUAHUO_SERVER_BASE_URL` | 可达的稳定 Server 私网 origin，无路径后缀 |
+| ConfigMap | `MASTRA_POSTGRES_HOST`、`MASTRA_POSTGRES_DATABASE`、`MASTRA_POSTGRES_USER` | 必须显式指定 |
+| ConfigMap | `MASTRA_POSTGRES_PORT`、`MASTRA_POSTGRES_SSL`、`MASTRA_POSTGRES_POOL_MAX` | 按目标数据库配置。端口默认 5432，连接池默认每 Pod 12 |
+| ConfigMap | `MODEL_PROVIDER`、模型配置 | 见 `.env.example`，使用现有授权的模型 |
+| ConfigMap | `HUAHUO_AGENT_PUBLIC_PATH`、`HUAHUO_STUDIO_ORIGIN`、`HUAHUO_STUDIO_AUTH_ENABLED` | 测试需要 Studio 登录时，与入口和 Server 协调。生产禁用 Studio 和手机登录 |
+| ConfigMap | `METRICS_ENABLED`、`OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | 指标走 Pod 私网端口 9464。外发 Trace 仅在显式提供采集地址后启用 |
+| Secret | `MASTRA_POSTGRES_PASSWORD`、所选模型的 API Key | 通过线上凭据管理配置。发布清单和 Git 中只保存 Secret 名称 |
 
-`scripts/release/plan.json` 记录实际成功基准、agent 角色、存储边界、配置操作、兼容判断和验收级别。首次尚无运行服务/成功记录时 `baseRevision:null`；后续必须填写宿主成功记录中的完整 SHA，宿主锁内再次比对。不能以 origin/main 或 origin/test 冒充已部署版本。
+线上 init container 先校验必需配置，再检查 Server 的就绪响应和匿名鉴权拒绝。线上 Agent 强制使用 PostgreSQL，并在开始监听 HTTP 前完成 Mastra 的存储初始化。Kubelet 使用 `/health` 检查 Pod 本身，存储持续可用性和模型调用仍在环境验收中单独验证。
 
-初次配置用 `/root/huahuo-agent/.env`，已有成功配置的值修改提前准备 `.env.candidate`；`configuration.mode:reuse` 复用上一成功快照。真实值不提交。ENV 值修改提供本期 `scripts/release/changes/<id>/verify-config.mjs`，脚本仅做本地断言，在 `--network none` 的候选镜像中限时执行，不输出配置值。
+### 网关与网络边界
 
-发布冻结一份权限 0600 的配置快照，候选和正式容器使用同一份。测试要求 `APP_ENV=test`，保持端口仅监听回环；Server 使用部署方维护的稳定内网入口，不绑定单个发布实例，数据库使用原有配置，不重置凭据。
+ClusterIP 的 4111 API 只允许同 namespace 的 Server API Pod 和明确标记 `huahuo.io/agent-trusted=true` 的受信工作负载。网关仍负责校验会话、丢弃客户端提供的身份头、写入受信身份头。公开 `/agent/api` 到内部 `/api` 的映射和测试 Studio 子路径沿用现有协议。网关接入前先验证匿名请求和外部伪造身份头的行为。
 
-## Agent 的存储边界
+Agent Pod 带 `huahuo.io/api-trusted=true`，符合现有 Server K3s 模板的 API 入站策略。9464 仅允许标记 `huahuo.io/metrics-trusted=true` 的同 namespace 采集端。跨 namespace、宿主网关或不同 CNI 的拓扑需要在接入时核对实际流量路径。NetworkPolicy 需要 CNI 执行，节点来源流量另按集群和宿主策略限制。参见 [Kubernetes NetworkPolicy](https://kubernetes.io/docs/concepts/services-networking/network-policies/)。
 
-Mastra 的 PostgresStore 在启动时初始化/升级自己的表。第二阶段启动候选即可能写入共享数据库，失败或应用回退不会撤销这些变化；框架升级前须审查旧版兼容。`migrations/0003_rag_state.sql` 等属于旧的独立 RAG 工具，自动发布不运行它们，也不调用 `rag:state:migrate`。计划出现额外迁移、数据修正或旧 SQL 改动会阻断，需要先形成独立的受审方案。
+## GitHub 发布
 
-第一期只增加原生记忆 JSON、工具和 Skill，不新增手写 SQL；Mastra 包版本和配置沿用当前工作区。兼容检查与替身测试不证明真实模型输出质量或共享数据库并发，相关边界在 PR 和验收记录中说明。
+1. 在受保护的 `main` 手动运行 **Agent Kubernetes release**，选择 `test`，在 `source_sha` 填入当前 `test` 的完整提交 SHA。流程核对同一 SHA 的成功 push CI，按 SHA 打包并推送到 ACR。
+2. 测试部署自动使用这次推送返回的 `sha256:...`。流程先做 Kubernetes 服务端 dry-run，再应用 NetworkPolicy 和工作负载，等待滚动更新，核对容器镜像并验证进程健康和匿名 API 401。记录 Actions 摘要中的源码 SHA、平台和镜像摘要。
+3. 验证测试环境的网关路径、Studio、持久化和业务链路。生产手动选择 `production`，在 `image_digest` 填入同一测试摘要，通过生产环境审批后从 ACR 拉取。生产应用关闭 Studio 页面和资源。
 
-## 五阶段
+首次接入构建机时可选择 `test` 并勾选 `build_only`，只构建和推送镜像，在 Actions 摘要核对 ARM64 和镜像摘要。构建机一次只跑一个发布构建，BuildKit 容器上限为 1.5 核 CPU 和 3 GiB 内存。构建前，Docker 数据目录与源码临时目录所在文件系统各需至少 25 GiB 空闲。若两者在同一块盘，只需同一份 25 GiB 余量。节点同时承载 Kubernetes 工作负载时，在该构建节点所属节点池将构建预算计入节点预留。 [Buildx 资源限制](https://docs.docker.com/build/builders/drivers/docker-container/) · [ACK 节点资源预留](https://www.alibabacloud.com/help/en/ack/ack-managed-and-ack-dedicated/user-guide/resource-reservation-policy)
 
-1. **预检构建与配置**：锁定目标和双 SHA、检查实际基准、磁盘及现有目录；从固定 Git 提交导出源码，构建完整 SHA 镜像；用不可变 ENV 快照运行本期本地配置断言。候选镜像仅携带内部Server地址，在Agent原有网络调用固定 `GET /health/ready` 和匿名 `GET /internal/v1/gateway/auth`，分别要求业务就绪及401。失败在初始化存储前停止，不查询Server提交、发布记录或容器。
-2. **Mastra 存储初始化**：以相同配置启动独立候选，使用回环随机端口；由原有框架执行初始化，无额外 RAG SQL。
-3. **候选验收**：固定本地 `/health` 必须为 200 和 `success:true`，匿名 `/api/agents` 必须为401。保留启动结果；这不证明真实用户、模型或数据持久化。
-4. **容器切换退出**：main Compose 只更新 agent，使用候选镜像和同一配置；旧容器按现有60秒停止预算退出。切换前核验上一成功配置摘要、镜像和控制Compose，预留恢复时间。替换或正式实例健康失败时，在同一发布锁内用上一成功镜像与原配置恢复，不运行迁移器。单一固定监听端口允许短暂中断，不承诺无损排空。
-5. **冒烟清理**：正式实例通过健康及匿名拒绝检查后，原子登记真实容器、应用/控制SHA、镜像ID、配置摘要和退出结果，再清理候选与未使用旧镜像。保留当前和上一成功版；清理失败记录为待清理，不把已切换的实际版本误记成旧版。没有生产模型、短信或用户数据操作。
+| GitHub 位置 | 所需配置 |
+| --- | --- |
+| 仓库变量 | `AGENT_IMAGE_REPOSITORY`（完整 ACR 地址/命名空间/仓库） |
+| `test` Environment 变量 | `AGENT_ACR_REGION_ID`（当前为 `cn-beijing`）、`AGENT_ACR_INSTANCE_ID`（ACR 企业版实例 ID）、`AGENT_BUILD_SSH_TARGET`（测试构建机的 `user@host` 或 `ssh://user@host:port`） |
+| `test` Environment Secrets | `ALIBABA_CLOUD_ACCESS_KEY_ID` 和 `ALIBABA_CLOUD_ACCESS_KEY_SECRET`（获准查询目标仓库、换取 ACR 令牌和推送 Agent 镜像的 RAM 身份），`AGENT_BUILD_SSH_KEY`（构建专用 SSH 私钥），`AGENT_BUILD_SSH_KNOWN_HOSTS`（经可信入口核验的构建机 `known_hosts` 记录） |
+| `test` 和 `production` Environment 变量 | `AGENT_K8S_CONTEXT` 与 `AGENT_K8S_NAMESPACE` |
+| `test` 和 `production` Environment Secret | `AGENT_KUBECONFIG`（已授权、有效期内的完整 kubeconfig） |
 
-宿主入口独立安装在 `/usr/local/sbin/huahuo-agent-test-release`；结果、配置快照和受限日志存于 `/var/lib/huahuo-agent-test-release`。当前和上一个成功版本的镜像/配置保留。日志、云命令输出不公开 ENV、JWT、响应正文或原始异常；Actions 只接受同实例、同命令、同调用及准确 SHA 的完整终态。
+北京 ACR 专有网络地址为 `huahuoai-docker-hub-registry-vpc.cn-beijing.cr.aliyuncs.com`。将 `AGENT_IMAGE_REPOSITORY` 设置为 `huahuoai-docker-hub-registry-vpc.cn-beijing.cr.aliyuncs.com/<acr-namespace>/<agent-repository>`，用实际的 ACR 命名空间和 Agent 仓库名替换占位符。ACR 命名空间和 Kubernetes namespace 分别配置。
 
-收到远端阶段证据才显示 N/5；调用前失败不造阶段进度。只见终态则明确终态复核。超时不自动重发，远端可能仍在运行。失败保留证据和已执行存储变化；恢复用上次成功镜像与对应配置，先确认当前 schema 仍兼容，不运行旧迁移器或撤销数据库变化。
+构建前先在目标 ACR 命名空间准备状态正常的私有仓库。工作流通过 ACR API 核对仓库，再用 RAM 身份换取一小时的登录凭据。构建机只接收临时 ACR 凭据。应用 `.env` 可以记录非敏感发布参数，GitHub 发布从上述变量和 Secrets 读取配置。 [ACR 获取仓库](https://www.alibabacloud.com/help/en/acr/developer-reference/api-cr-2018-12-01-getrepository) · [ACR 临时凭据](https://www.alibabacloud.com/help/en/acr/developer-reference/api-cr-2018-12-01-getauthorizationtoken)
 
-发布结果保留已验证的云助手 invocationId。Agent 专用宿主命令可在失败终态附带固定检查项、错误码和可选退出码，由同一调用器写入 Actions Summary；没有新增 Job、云请求或日志上传。诊断缺失/非法明确标注，保留原发布失败，不据此猜测根因或自动重发。协议、开销与宿主补丁见[轻量发布诊断](release-diagnostics.md)。会话已授权范围内的 Agent 日志、原调用和容器状态只读核验直接执行；一个身份/入口失败仅证明该入口不可用，应检查其余已授权路径，全部不足后再说明具体缺少的访问或信息。
+仅允许受保护的 `main` 使用发布 Environment。GitHub 发布任务通过已有 SSH 入口调用云上测试机，使用专用构建账户、密钥和经核验的 SSH 主机公钥。构建机需要 Bash、`tar`、`jq`、本机 Linux ARM64 Docker 和 Buildx，以及访问构建依赖与 ACR VPC 地址的网络。工作流发送已验证 SHA 的 Git 源码归档，测试机原生构建并返回镜像摘要。构建凭据和源码在每次任务的私有临时目录中处理，退出时清理。 [GitHub 环境的分支限制](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments#deployment-branches-and-tags) · [OpenSSH 主机校验](https://man.openbsd.org/ssh_config) · [Git 归档](https://git-scm.com/docs/git-archive) · [ACR VPC 访问](https://www.alibabacloud.com/help/en/acr/user-guide/configure-access-over-vpcs)
 
-## 验证
+测试与生产的 Pod 只调度到 Linux ARM64 节点，节点需要能访问 ACR VPC 地址以拉取镜像。自动部署要求 GitHub 托管 runner 能通过已有授权路径访问 Kubernetes API。API 仅在私网可达时，可在能访问该 API 的机器使用以下命令部署已验摘要。部署身份需要应用清单、监视 rollout 和执行 Pod 冒烟所需权限。 [ACK kubeconfig](https://www.alibabacloud.com/help/en/ack/ack-managed-and-ack-dedicated/user-guide/kubeconfig-operation-guide/) · [Kubernetes RBAC 实践](https://kubernetes.io/docs/concepts/security/rbac-good-practices/)
 
 ```bash
-pnpm typecheck
-pnpm test
-pnpm build --studio
-pnpm rag:acceptance:dense:mock
-# CI: review a clean candidate without granting deployment.
-pnpm release:review
-# Ordinary deployment: every compatibility decision must be true.
-pnpm release:check
+KUBECONFIG=/path/to/approved-kubeconfig \
+AGENT_K8S_CONTEXT=approved-context \
+AGENT_K8S_NAMESPACE=approved-namespace \
+AGENT_IMAGE_REPOSITORY='huahuoai-docker-hub-registry-vpc.cn-beijing.cr.aliyuncs.com/<acr-namespace>/<agent-repository>' \
+scripts/kubernetes/deploy.sh test 'sha256:<verified-digest>'
 ```
 
-CI 不读取真实 .env 或 secrets，使用模拟模型、隔离内存适配器和云 API fixtures。`release:smoke` 只允许进程内的固定本地 health URL，4 秒上限和 4 KiB 响应限制；健康不代表 Server、认证业务、模型付费调用或数据库持久化已验证。
+### 回退与存储
 
-GitHub test/production 仅允许 main 控制流程。OIDC Provider 复用已验证的 GitHub issuer（阿里云同一账号 issuer URL 唯一），Agent 使用独立 RAM 角色和精确 Agent 仓库/environment subject。角色只允许对确认的实例和 Agent 固定命令 InvokeCommand、DescribeInvocationResults；不新增长期 AK 或 GitHub token。正式生产尚未接入。
+每次记录上一成功镜像摘要和使用的配置版本，ACR 保留已使用的摘要。失败先核对 Pod 事件、rollout 状态和实际运行摘要。生产可通过工作流推广上一摘要，测试可使用上面的 `deploy.sh test` 重新部署上一摘要。Mastra 管理自己的表，回退镜像会保留已提交的存储变更。独立 RAG 迁移脚本不参与集群发布。
 
-## 统一入口切换候选（2026-11-16）
+仅更新 ConfigMap 或 Secret 时，环境变量会在新 Pod 启动时加载。同一摘要下的配置轮换需要对已授权 Deployment 执行滚动重启，再跑验收。
 
-Agent独立发布和恢复，不执行Server发布流程。宿主入口调整独立于应用发布。Agent 的 JWT/ServiceKey 认证已移除，业务沿用可信身份头和原生 Mastra 资源隔离。Studio 登录继续由 Agent 提供 UI，跳转、刷新、退出由 Server 与入口处理；Agent 不再保留另一套退出和匿名导航重定向逻辑。
+首轮为单副本滚动更新，最多短时并存两个 Agent Pod。确认连接池容量和混合版本期间的存储兼容性。Pod 终止宽限为 60 秒，Mastra 的 HTTP 排空与入口的 SSE 超时仍需结合真实长流量验收。
 
-`HUAHUO_SERVER_BASE_URL` 使用稳定内部 origin，`HUAHUO_STUDIO_ORIGIN` 使用浏览器 origin，`HUAHUO_AGENT_PUBLIC_PATH=/agent` 两端一致。项目只维护应用契约；Nginx 配置与宿主切流脚本位于仓库外。首次候选的api/configuration曾保持false，表示当时新接入契约未验收；首次独立维护完成后，以真实成功基准与已验证配置恢复正常更新。这不代表Server与Agent绑定发布。
+## 轻量本地验收
 
-## 执行器升级与首次接入
+日常开发用 `pnpm dev`，代码检查用 `pnpm typecheck` 和 `pnpm test`。需要验证 Kubernetes 启动时，在现有 Docker 上用一个独立 K3s 节点。下面命令不配置额外负载均衡、存储插件或指标服务。
 
-宿主执行器v2与部署代码独立维护，固定云命令仍只接受准确test SHA。它增加Server契约预检、匿名API拒绝检查、同锁恢复和原子成功记录。执行器的候选、备份及无Docker模拟验证记录在宿主维护目录；安装、目标实际执行结果另记，不能把本地测试当成已经替换宿主。
+```bash
+k3d cluster create huahuo-agent-local --servers 1 --agents 0 --no-lb \
+  --api-port 127.0.0.1:16447 \
+  --kubeconfig-update-default=false --kubeconfig-switch-context=false \
+  --env 'GOMEMLIMIT=448MiB@server:0' \
+  --k3s-arg '--disable=traefik,servicelb,local-storage,metrics-server@server:0'
+docker build --build-arg MASTRA_BUILD_STUDIO=false -t huahuo-agent:local .
+k3d image import huahuo-agent:local --cluster huahuo-agent-local
 
-首次从旧JWT/ServiceKey调用方式改为可信身份协议时，候选api/configuration保留false，普通自动入口因此deferred。首次接入由一次性、固定应用/控制SHA与实际基准的独立维护执行；维护先验证Server接口和完整候选配置，仍只操作Agent，不执行Server发布或修改宿主Nginx。完成后登记实际成功SHA，后续版本才以该基准恢复普通自动发布。不存在通用force或跳过数据库兼容的开关。
+local_kubeconfig=$(mktemp)
+k3d kubeconfig get huahuo-agent-local > "$local_kubeconfig"
+kubectl --kubeconfig "$local_kubeconfig" apply -k k8s/overlays/local
+kubectl --kubeconfig "$local_kubeconfig" -n huahuo-agent-local rollout status deployment/huahuo-agent --timeout=180s
+kubectl --kubeconfig "$local_kubeconfig" -n huahuo-agent-local exec deployment/huahuo-agent \
+  -- node /app/release/runtime-check.mjs
+KUBECONFIG="$local_kubeconfig" k3d cluster delete huahuo-agent-local
+rm -f -- "$local_kubeconfig"
+```
 
-恢复使用上一成功镜像、不可变配置及旧控制Compose，只能证明原进程恢复；首次接口破坏性接入时，旧二进制未必兼容当前Server，不能把进程健康称为完整业务恢复。数据库已由Mastra提交的变化不会回退。恢复失败保留现场与failure.json，不自动重发发布命令。
+本地 overlay 跟随开发机架构，只运行一个 API-only Pod，内存存储，请求 50m CPU 和 192 MiB 内存。无线上 Secret 或数据库，禁用指标和外连。镜像通过本机导入，Pod 不访问镜像仓库。 [k3d 单节点参数](https://k3d.io/stable/usage/commands/k3d_cluster_create/)

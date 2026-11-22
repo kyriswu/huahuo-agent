@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: huahuo-agent-local
+resources:
+  - ../../base
+  - namespace.yaml
+images:
+  - name: example.invalid/huahuo-agent
+    newName: huahuo-agent
+    newTag: local
+patches:
+  - path: deployment.yaml
+  - path: network-policy.yaml

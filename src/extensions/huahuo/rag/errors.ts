@@ -1,13 +1,3 @@
-export class UnsupportedSearchModeError extends Error {
-  public readonly mode: string;
-
-  constructor(mode: string) {
-    super(`Search mode "${mode}" is not available in the configured provider`);
-    this.mode = mode;
-    this.name = 'UnsupportedSearchModeError';
-  }
-}
-
 export type RagErrorCode =
   | 'RAG_CONFIG_INVALID'
   | 'EMBEDDING_CONFIGURATION_MISSING'
