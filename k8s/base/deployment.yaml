@@ -1,0 +1,131 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: huahuo-agent
+  labels:
+    app.kubernetes.io/name: huahuo-agent
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  progressDeadlineSeconds: 360
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: huahuo-agent
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: huahuo-agent
+        huahuo.io/api-trusted: "true"
+    spec:
+      serviceAccountName: huahuo-agent
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: preflight
+          image: example.invalid/huahuo-agent:unconfigured
+          imagePullPolicy: IfNotPresent
+          command: ["node", "/app/release/kubernetes-preflight.mjs"]
+          envFrom:
+            - configMapRef:
+                name: huahuo-agent-config
+          env:
+            - name: MASTRA_POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: huahuo-agent-secrets
+                  key: MASTRA_POSTGRES_PASSWORD
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+      containers:
+        - name: agent
+          image: example.invalid/huahuo-agent:unconfigured
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: huahuo-agent-config
+            - secretRef:
+                name: huahuo-agent-secrets
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: MASTRA_SKIP_DOTENV
+              value: "true"
+            - name: MASTRA_TELEMETRY_DISABLED
+              value: "1"
+            - name: MASTRA_POSTGRES_REQUIRED
+              value: "true"
+            - name: MASTRA_HOST
+              value: 0.0.0.0
+            - name: PORT
+              value: "4111"
+            - name: METRICS_HOST
+              value: 0.0.0.0
+            - name: METRICS_PORT
+              value: "9464"
+            - name: HOME
+              value: /tmp
+          ports:
+            - name: http
+              containerPort: 4111
+            - name: metrics
+              containerPort: 9464
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 2
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 15
+            timeoutSeconds: 2
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 768Mi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi

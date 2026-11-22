@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: huahuo-agent
+  labels:
+    app.kubernetes.io/name: huahuo-agent
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: huahuo-agent
+  ports:
+    - name: http
+      port: 4111
+      targetPort: http
+      protocol: TCP

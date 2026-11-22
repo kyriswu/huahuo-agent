@@ -1,0 +1,124 @@
+name: Agent Kubernetes release
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Kubernetes environment
+        type: choice
+        options: [test, production]
+        required: true
+      source_sha:
+        description: Test only. Full current test SHA with successful Agent CI.
+        type: string
+        required: false
+      image_digest:
+        description: Production only. Digest already verified in test (sha256:…)
+        type: string
+        required: false
+
+permissions: {}
+
+concurrency:
+  group: huahuo-agent-kubernetes-${{ inputs.target }}
+  cancel-in-progress: false
+
+jobs:
+  validate-input:
+    if: >-
+      github.repository == 'kyriswu/huahuo-agent' &&
+      github.ref == 'refs/heads/main' && github.ref_protected &&
+      github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      image_repository: ${{ steps.inputs.outputs.image_repository }}
+    steps:
+      - name: Validate the release input for the selected environment
+        id: inputs
+        shell: bash
+        env:
+          TARGET: ${{ inputs.target }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          IMAGE_DIGEST: ${{ inputs.image_digest }}
+          IMAGE_REPOSITORY: ${{ vars.AGENT_IMAGE_REPOSITORY }}
+        run: |
+          case "$TARGET" in
+            test)
+              if [[ ! "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ || -n "$IMAGE_DIGEST" ]]; then
+                printf '%s\n' AGENT_K8S_TEST_REQUIRES_SOURCE_SHA_ONLY >&2
+                exit 1
+              fi
+              ;;
+            production)
+              if [[ -n "$SOURCE_SHA" || ! "$IMAGE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+                printf '%s\n' AGENT_K8S_PRODUCTION_REQUIRES_VERIFIED_DIGEST_ONLY >&2
+                exit 1
+              fi
+              ;;
+            *)
+              printf '%s\n' AGENT_K8S_TARGET_INVALID >&2
+              exit 1
+              ;;
+          esac
+          if [[ ! "$IMAGE_REPOSITORY" =~ ^[a-z0-9][a-z0-9.-]*(:[0-9]{1,5})?(/[a-z0-9][a-z0-9._-]*)+$ ]]; then
+            printf '%s\n' AGENT_IMAGE_REPOSITORY_INVALID >&2
+            exit 1
+          fi
+          printf 'image_repository=%s\n' "$IMAGE_REPOSITORY" >> "$GITHUB_OUTPUT"
+
+  publish-test:
+    needs: validate-input
+    if: inputs.target == 'test'
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/agent-image.yml
+    with:
+      source_sha: ${{ inputs.source_sha }}
+    secrets:
+      AGENT_REGISTRY_USERNAME: ${{ secrets.AGENT_REGISTRY_USERNAME }}
+      AGENT_REGISTRY_PASSWORD: ${{ secrets.AGENT_REGISTRY_PASSWORD }}
+
+  release:
+    needs: [validate-input, publish-test]
+    if: >-
+      !cancelled() && needs.validate-input.result == 'success' &&
+      ((inputs.target == 'test' && needs.publish-test.result == 'success') ||
+       (inputs.target == 'production' && needs.publish-test.result == 'skipped'))
+    permissions:
+      contents: read
+    environment: ${{ inputs.target }}
+    runs-on: ${{ vars.AGENT_K8S_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Verify trusted main control revision
+        run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - name: Apply the verified image digest and smoke Agent
+        shell: bash
+        env:
+          AGENT_K8S_TARGET: ${{ inputs.target }}
+          AGENT_IMAGE_DIGEST: ${{ inputs.target == 'test' && needs.publish-test.outputs.image_digest || inputs.image_digest }}
+          AGENT_IMAGE_REPOSITORY: ${{ needs.validate-input.outputs.image_repository }}
+          AGENT_K8S_CONTEXT: ${{ vars.AGENT_K8S_CONTEXT }}
+          AGENT_K8S_NAMESPACE: ${{ vars.AGENT_K8S_NAMESPACE }}
+          AGENT_KUBECONFIG: ${{ secrets.AGENT_KUBECONFIG }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$AGENT_KUBECONFIG" ]]; then
+            printf '%s\n' AGENT_K8S_KUBECONFIG_REQUIRED >&2
+            exit 1
+          fi
+          umask 077
+          kubeconfig=$(mktemp "$RUNNER_TEMP/huahuo-agent-kubeconfig.XXXXXX")
+          trap 'rm -f -- "$kubeconfig"' EXIT
+          printf '%s\n' "$AGENT_KUBECONFIG" > "$kubeconfig"
+          chmod 0600 "$kubeconfig"
+          unset AGENT_KUBECONFIG
+          KUBECONFIG="$kubeconfig" scripts/kubernetes/deploy.sh "$AGENT_K8S_TARGET" "$AGENT_IMAGE_DIGEST"
+          printf '## Agent Kubernetes release\n\n- Environment `%s`\n- Image `%s@%s`\n' \
+            "$AGENT_K8S_TARGET" "$AGENT_IMAGE_REPOSITORY" "$AGENT_IMAGE_DIGEST" >> "$GITHUB_STEP_SUMMARY"

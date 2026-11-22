@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: huahuo-agent
+spec:
+  template:
+    spec:
+      initContainers:
+        - name: preflight
+          env:
+            - name: APP_ENV
+              value: production
+      containers:
+        - name: agent
+          env:
+            - name: APP_ENV
+              value: production
+            - name: HUAHUO_STUDIO_AUTH_ENABLED
+              value: "false"

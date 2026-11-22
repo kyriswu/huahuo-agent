@@ -11,8 +11,9 @@
 !scripts/
 !scripts/release/
 !scripts/release/smoke.mjs
-!scripts/release/changes/
-!scripts/release/changes/**
+!scripts/release/server-preflight.mjs
+!scripts/release/runtime-check.mjs
+!scripts/release/kubernetes-preflight.mjs
 
 **/.env
 **/.env.*

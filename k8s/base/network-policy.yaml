@@ -1,0 +1,29 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: huahuo-agent-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: huahuo-agent
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        # Label only the gateway and internal callers that enforce trusted identity.
+        - podSelector:
+            matchLabels:
+              huahuo.io/agent-trusted: "true"
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: huahuo-server
+              app.kubernetes.io/component: api
+      ports:
+        - protocol: TCP
+          port: 4111
+    - from:
+        - podSelector:
+            matchLabels:
+              huahuo.io/metrics-trusted: "true"
+      ports:
+        - protocol: TCP
+          port: 9464

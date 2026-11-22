@@ -21,14 +21,22 @@ import {createAgentObservability} from '../observability/mastra.js';
 
 function createPostgresStorage() {
   const password = process.env.MASTRA_POSTGRES_PASSWORD?.trim();
+  if (process.env.MASTRA_POSTGRES_REQUIRED === 'true') {
+    if (!password) throw new Error('MASTRA_POSTGRES_PASSWORD_REQUIRED');
+    if (process.env.MASTRA_DISABLE_STORAGE_INIT === 'true') throw new Error('MASTRA_STORAGE_INIT_REQUIRED');
+  }
   if (!password) return undefined;
+  const host = process.env.MASTRA_POSTGRES_HOST?.trim();
+  const database = process.env.MASTRA_POSTGRES_DATABASE?.trim();
+  const user = process.env.MASTRA_POSTGRES_USER?.trim();
+  if (!host || !database || !user) throw new Error('MASTRA_POSTGRES_COORDINATES_REQUIRED');
 
   return new PostgresStore({
     id: 'huahuo-mastra-postgres',
-    host: process.env.MASTRA_POSTGRES_HOST ?? 'pgm-2ze7o54d25m8kn53no.pg.rds.aliyuncs.com',
+    host,
     port: Number(process.env.MASTRA_POSTGRES_PORT ?? '5432'),
-    database: process.env.MASTRA_POSTGRES_DATABASE ?? 'huahuo_mastra_memory_20261025',
-    user: process.env.MASTRA_POSTGRES_USER ?? 'huahuo_admin',
+    database,
+    user,
     password,
     ssl: mastraConfig.postgresSsl,
     max: mastraConfig.postgresPoolMax,
@@ -53,10 +61,19 @@ export const mastra = new Mastra({
     mcp: { enabled: false },
     auth: huahuoAuth,
     apiRoutes: [...studioGateway.routes, createAiTemplateRoute()],
-    middleware: [createStudioPrefixMiddleware(agentPublicPath()), traceMiddleware, studioGateway.middleware, huahuoAuthMiddleware],
+    middleware: [createStudioPrefixMiddleware(agentPublicPath(), process.env.APP_ENV !== 'production'), traceMiddleware, studioGateway.middleware, huahuoAuthMiddleware],
   },
   agents: { huoxAgent, weatherAgent },
   tools: { huahuoRagQueryTool, weatherTool, ...deepseekWebTools },
   gateways: { chatgptOpenAI: chatgptOpenAIGateway },
   workflows: { weatherWorkflow },
 });
+
+// The deployer's HTTP server can start before its storage init. Complete
+// Mastra's idempotent initialization before the server can report healthy.
+try {
+  await storage?.init();
+} catch (error) {
+  if (error instanceof Error) logger.trackException(error);
+  throw new Error('MASTRA_STORAGE_INIT_FAILED');
+}

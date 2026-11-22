@@ -38,13 +38,18 @@ jobs:
           pnpm install --frozen-lockfile
       - name: Typecheck
         run: pnpm typecheck
-      - name: Review release plan without granting deployment
-        run: pnpm release:review
+      - name: Render Kubernetes overlays offline
+        run: |
+          for target in local test production; do
+            kubectl kustomize "k8s/overlays/$target" > /dev/null
+          done
       - name: Unit, contract and release tests (isolated fixtures)
         run: pnpm test
       - name: Build API and Studio
         run: pnpm build --studio
       - name: Verify built Studio subpath and native authentication
-        run: pnpm test:studio:built
+        run: |
+          pnpm test:studio:built
+          pnpm test:studio:built --production
       - name: Deterministic RAG acceptance
         run: pnpm rag:acceptance:dense:mock
