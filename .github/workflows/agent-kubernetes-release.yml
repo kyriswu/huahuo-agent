@@ -83,6 +83,15 @@ jobs:
     permissions:
       contents: read
       actions: read
+      id-token: write
+    env:
+      AGENT_ACR_REGION_ID: ${{ vars.AGENT_ACR_REGION_ID }}
+      AGENT_BUILD_INSTANCE_ID: ${{ vars.AGENT_BUILD_INSTANCE_ID }}
+      AGENT_BUILD_COMMAND_ID: ${{ vars.AGENT_BUILD_COMMAND_ID }}
+      AGENT_BUILD_OIDC_PROVIDER_ARN: ${{ vars.AGENT_BUILD_OIDC_PROVIDER_ARN }}
+      AGENT_BUILD_ROLE_ARN: ${{ vars.AGENT_BUILD_ROLE_ARN }}
+      ALIBABA_CLOUD_IGNORE_PROFILE: 'TRUE'
+      ALIBABA_CLOUD_CLI_PLUGIN_AUTO_INSTALL: 'false'
     outputs:
       image_digest: ${{ steps.publish.outputs.image_digest }}
     steps:
@@ -105,12 +114,11 @@ jobs:
         run: |
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           node scripts/kubernetes/agent-image-source.mjs
-      - name: Checkout verified Agent source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ steps.candidate.outputs.source_sha }}
-          path: verified-source
-          persist-credentials: false
+      - name: Verify Cloud Assistant target and test-environment OIDC claims
+        env:
+          SOURCE_SHA: ${{ steps.candidate.outputs.source_sha }}
+          AGENT_IMAGE_REPOSITORY: ${{ steps.candidate.outputs.image_repository }}
+        run: node scripts/kubernetes/invoke-agent-cloud-build.mjs --verify-oidc
       - name: Install the pinned Alibaba Cloud CLI
         shell: bash
         run: |
@@ -122,64 +130,29 @@ jobs:
           tar -xzf "$archive" -C "$RUNNER_TEMP/aliyun-cli" aliyun
           rm -f -- "$archive"
           printf '%s\n' "$RUNNER_TEMP/aliyun-cli" >> "$GITHUB_PATH"
-      - name: Build and push from the cloud test machine
+      - name: Obtain temporary Cloud Assistant credentials
+        uses: aliyun/configure-aliyun-credentials-action@1e5248c8d5d93a8781ac344a68e19a43341e79e6 # v1.1.0
+        with:
+          oidc-provider-arn: ${{ env.AGENT_BUILD_OIDC_PROVIDER_ARN }}
+          role-to-assume: ${{ env.AGENT_BUILD_ROLE_ARN }}
+          audience: sts.aliyuncs.com
+          role-session-expiration: 3600
+          role-session-name: gha-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Invoke the fixed Cloud Assistant build and verify the result
         id: publish
+        env:
+          SOURCE_SHA: ${{ steps.candidate.outputs.source_sha }}
+          AGENT_IMAGE_REPOSITORY: ${{ steps.candidate.outputs.image_repository }}
+        run: node scripts/kubernetes/invoke-agent-cloud-build.mjs
+      - name: Record the verified Agent image
         shell: bash
         env:
           SOURCE_SHA: ${{ steps.candidate.outputs.source_sha }}
           IMAGE_REPOSITORY: ${{ steps.candidate.outputs.image_repository }}
-          BUILD_TARGET: ${{ vars.AGENT_BUILD_SSH_TARGET }}
-          BUILD_KEY: ${{ secrets.AGENT_BUILD_SSH_KEY }}
-          BUILD_KNOWN_HOSTS: ${{ secrets.AGENT_BUILD_SSH_KNOWN_HOSTS }}
-          ACR_INSTANCE_ID: ${{ vars.AGENT_ACR_INSTANCE_ID }}
-          ALIBABA_CLOUD_REGION_ID: ${{ vars.AGENT_ACR_REGION_ID }}
-          ALIBABA_CLOUD_ACCESS_KEY_ID: ${{ secrets.ALIBABA_CLOUD_ACCESS_KEY_ID }}
-          ALIBABA_CLOUD_ACCESS_KEY_SECRET: ${{ secrets.ALIBABA_CLOUD_ACCESS_KEY_SECRET }}
-          ALIBABA_CLOUD_IGNORE_PROFILE: 'TRUE'
-          ALIBABA_CLOUD_CLI_PLUGIN_AUTO_INSTALL: 'false'
+          IMAGE_DIGEST: ${{ steps.publish.outputs.image_digest }}
         run: |
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          test "$(git -C verified-source rev-parse HEAD)" = "$SOURCE_SHA"
-          : "${BUILD_TARGET:?Configure AGENT_BUILD_SSH_TARGET}"
-          : "${BUILD_KEY:?Configure AGENT_BUILD_SSH_KEY}"
-          : "${BUILD_KNOWN_HOSTS:?Configure AGENT_BUILD_SSH_KNOWN_HOSTS}"
-          : "${ALIBABA_CLOUD_ACCESS_KEY_ID:?Configure ALIBABA_CLOUD_ACCESS_KEY_ID}"
-          : "${ALIBABA_CLOUD_ACCESS_KEY_SECRET:?Configure ALIBABA_CLOUD_ACCESS_KEY_SECRET}"
-          umask 077
-          scratch=$(mktemp -d "$RUNNER_TEMP/agent-image.XXXXXX")
-          trap 'rm -rf -- "$scratch"' EXIT
-          printf '%s\n' "$BUILD_KEY" > "$scratch/ssh-key"
-          printf '%s\n' "$BUILD_KNOWN_HOSTS" > "$scratch/known-hosts"
-          unset BUILD_KEY BUILD_KNOWN_HOSTS
-          bash scripts/kubernetes/acr-auth.sh "$ALIBABA_CLOUD_REGION_ID" "$ACR_INSTANCE_ID" "$IMAGE_REPOSITORY" "$scratch"
-          unset ALIBABA_CLOUD_ACCESS_KEY_ID ALIBABA_CLOUD_ACCESS_KEY_SECRET
-          printf '::add-mask::%s\n' "$(cat "$scratch/registry-username")" "$(cat "$scratch/registry-password")"
-          printf '%s\n' "$SOURCE_SHA" > "$scratch/source-sha"
-          printf '%s\n' "$IMAGE_REPOSITORY" > "$scratch/image-repository"
-          git -C verified-source archive --format=tar.gz --output="$scratch/source.tar.gz" "$SOURCE_SHA"
-          cp scripts/kubernetes/build-agent-image.sh "$scratch/build-agent-image.sh"
-
-          remote_script=$(cat <<'REMOTE'
-          set -eu
-          umask 077
-          work=$(mktemp -d)
-          trap 'rm -rf -- "$work"' EXIT
-          tar -xf - -C "$work"
-          bash "$work/build-agent-image.sh" "$work"
-          REMOTE
-          )
-          digest=$(tar -C "$scratch" -cf - build-agent-image.sh source.tar.gz source-sha image-repository registry-username registry-password |
-            ssh -F /dev/null -T -o BatchMode=yes -o IdentitiesOnly=yes -o ClearAllForwardings=yes \
-              -o StrictHostKeyChecking=yes -o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile="$scratch/known-hosts" \
-              -o ConnectTimeout=15 -o ServerAliveInterval=30 -o ServerAliveCountMax=3 \
-              -i "$scratch/ssh-key" -- "$BUILD_TARGET" "$remote_script")
-          if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
-            printf '%s\n' AGENT_IMAGE_DIGEST_INVALID >&2
-            exit 1
-          fi
-          printf 'image_digest=%s\n' "$digest" >> "$GITHUB_OUTPUT"
           printf '## Agent image\n\n- Source commit `%s`\n- Platform `linux/arm64`\n- Image `%s@%s`\n' \
-            "$SOURCE_SHA" "$IMAGE_REPOSITORY" "$digest" >> "$GITHUB_STEP_SUMMARY"
+            "$SOURCE_SHA" "$IMAGE_REPOSITORY" "$IMAGE_DIGEST" >> "$GITHUB_STEP_SUMMARY"
 
   release:
     needs: [validate-input, publish-test]

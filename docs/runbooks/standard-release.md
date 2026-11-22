@@ -40,16 +40,23 @@ Agent Pod 带 `huahuo.io/api-trusted=true`，符合现有 Server K3s 模板的 A
 | GitHub 位置 | 所需配置 |
 | --- | --- |
 | 仓库变量 | `AGENT_IMAGE_REPOSITORY`（完整 ACR 地址/命名空间/仓库） |
-| `test` Environment 变量 | `AGENT_ACR_REGION_ID`（当前为 `cn-beijing`）、`AGENT_ACR_INSTANCE_ID`（ACR 企业版实例 ID）、`AGENT_BUILD_SSH_TARGET`（测试构建机的 `user@host` 或 `ssh://user@host:port`） |
-| `test` Environment Secrets | `ALIBABA_CLOUD_ACCESS_KEY_ID` 和 `ALIBABA_CLOUD_ACCESS_KEY_SECRET`（获准查询目标仓库、换取 ACR 令牌和推送 Agent 镜像的 RAM 身份），`AGENT_BUILD_SSH_KEY`（构建专用 SSH 私钥），`AGENT_BUILD_SSH_KNOWN_HOSTS`（经可信入口核验的构建机 `known_hosts` 记录） |
+| `test` Environment 变量 | `AGENT_ACR_REGION_ID`（ECS 构建所在地域，当前为 `cn-beijing`）、`AGENT_BUILD_INSTANCE_ID`、`AGENT_BUILD_COMMAND_ID`、`AGENT_BUILD_OIDC_PROVIDER_ARN`、`AGENT_BUILD_ROLE_ARN` |
 | `test` 和 `production` Environment 变量 | `AGENT_K8S_CONTEXT` 与 `AGENT_K8S_NAMESPACE` |
 | `test` 和 `production` Environment Secret | `AGENT_KUBECONFIG`（已授权、有效期内的完整 kubeconfig） |
 
 北京 ACR 专有网络地址为 `huahuoai-docker-hub-registry-vpc.cn-beijing.cr.aliyuncs.com`。将 `AGENT_IMAGE_REPOSITORY` 设置为 `huahuoai-docker-hub-registry-vpc.cn-beijing.cr.aliyuncs.com/<acr-namespace>/<agent-repository>`，用实际的 ACR 命名空间和 Agent 仓库名替换占位符。ACR 命名空间和 Kubernetes namespace 分别配置。
 
-构建前先在目标 ACR 命名空间准备状态正常的私有仓库。工作流通过 ACR API 核对仓库，再用 RAM 身份换取一小时的登录凭据。构建机只接收临时 ACR 凭据。应用 `.env` 可以记录非敏感发布参数，GitHub 发布从上述变量和 Secrets 读取配置。 [ACR 获取仓库](https://www.alibabacloud.com/help/en/acr/developer-reference/api-cr-2018-12-01-getrepository) · [ACR 临时凭据](https://www.alibabacloud.com/help/en/acr/developer-reference/api-cr-2018-12-01-getauthorizationtoken)
+### 云助手构建机
 
-仅允许受保护的 `main` 使用发布 Environment。GitHub 发布任务通过已有 SSH 入口调用云上测试机，使用专用构建账户、密钥和经核验的 SSH 主机公钥。构建机需要 Bash、`tar`、`jq`、本机 Linux ARM64 Docker 和 Buildx，以及访问构建依赖与 ACR VPC 地址的网络。工作流发送已验证 SHA 的 Git 源码归档，测试机原生构建并返回镜像摘要。构建凭据和源码在每次任务的私有临时目录中处理，退出时清理。 [GitHub 环境的分支限制](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments#deployment-branches-and-tags) · [OpenSSH 主机校验](https://man.openbsd.org/ssh_config) · [Git 归档](https://git-scm.com/docs/git-archive) · [ACR VPC 访问](https://www.alibabacloud.com/help/en/acr/user-guide/configure-access-over-vpcs)
+1. 将 `scripts/kubernetes` 中的 `cloud-build-agent-image.sh`、`acr-auth.sh` 和 `build-agent-image.sh` 从审核过的提交安装到构建节点 `/opt/huahuo-agent-build`。目录和文件由 root 管理。构建节点需要 `git`、`curl`、`jq`、`flock`、阿里云 CLI、ARM64 Docker 和 Buildx。专用 CLI 可放在同目录的 `bin/aliyun`。确认节点能访问 GitHub、构建依赖和 ACR VPC 端点。
+2. 在同一目录用 root 创建 `config.json`，将 `region`、`ecsInstanceId`、`instanceId`、`imageRepository` 和 `ramRoleName` 分别设为地域、构建 ECS 实例 ID、ACR 企业版实例 ID、完整私有仓库地址和 ECS 实例角色名称。实例角色只需读取指定构建命令的调用记录、查询指定 ACR 仓库和推送权限，以及换取短期 ACR 凭据。实例身份通过 IMDSv2 获取。 [云助手权限](https://www.alibabacloud.com/help/en/ecs/user-guide/use-ram-to-implement-permission-control) · [ECS 实例角色](https://www.alibabacloud.com/help/en/ecs/user-guide/attach-an-instance-ram-role-to-an-ecs-instance) · [ACR RAM 权限](https://www.alibabacloud.com/help/en/acr/user-guide/ram-authorization-information)
+3. 注册固定 Shell 命令，启用下列云助手内置变量，执行超时 20 分钟。仅允许受保护的 `main` 使用 GitHub `test` Environment。OIDC 角色绑定 GitHub 发行方、`sts.aliyuncs.com` 受众和 `repo:kyriswu@5120703/huahuo-agent@1427064230:environment:test`。调用和结果读取权限限定为该命令和该实例，调用的 `ecs:CommandRunAs` 固定为 `root`。 [GitHub 环境分支限制](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments#deployment-branches-and-tags) · [云助手内置变量](https://www.alibabacloud.com/help/en/ecs/user-guide/use-custom-parameters-in-cloud-assistant-commands)
+
+```bash
+exec /usr/bin/env -i /bin/bash -p /opt/huahuo-agent-build/cloud-build-agent-image.sh '{{ACS::InvokeId}}' '{{ACS::CommandId}}'
+```
+
+4. GitHub 把准确的提交 SHA 写入调用标签 `source-sha`。构建机读取本次调用的标签，确认它等于当前受保护的 `test` 头，再核对相同 SHA 的成功 push CI。随后从该提交归档源码并原生构建、推送 ARM64 镜像。GitHub 核对回执中的仓库、提交 SHA 和镜像摘要后继续。 [云助手调用查询](https://www.alibabacloud.com/help/en/ecs/developer-reference/api-ecs-2014-05-26-describeinvocations)
 
 测试与生产的 Pod 只调度到 Linux ARM64 节点，节点需要能访问 ACR VPC 地址以拉取镜像。自动部署要求 GitHub 托管 runner 能通过已有授权路径访问 Kubernetes API。API 仅在私网可达时，可在能访问该 API 的机器使用以下命令部署已验摘要。部署身份需要应用清单、监视 rollout 和执行 Pod 冒烟所需权限。 [ACK kubeconfig](https://www.alibabacloud.com/help/en/ack/ack-managed-and-ack-dedicated/user-guide/kubeconfig-operation-guide/) · [Kubernetes RBAC 实践](https://kubernetes.io/docs/concepts/security/rbac-good-practices/)
 
