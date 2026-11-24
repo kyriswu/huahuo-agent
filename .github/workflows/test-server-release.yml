@@ -15,12 +15,12 @@ permissions:
   actions: read
   id-token: write
 
-# Non-secret repository variables; the caller and OIDC checks enforce fixed targets.
+# Non-secret deployment configuration. The caller and OIDC checks enforce fixed targets.
 env:
   TEST_RELEASE_REGION_ID: ${{ vars.TEST_RELEASE_REGION_ID }}
   TEST_RELEASE_INSTANCE_ID: ${{ vars.TEST_RELEASE_INSTANCE_ID }}
   TEST_RELEASE_COMMAND_ID: ${{ vars.TEST_RELEASE_COMMAND_ID }}
-  TEST_RELEASE_OIDC_PROVIDER_ARN: ${{ vars.TEST_RELEASE_OIDC_PROVIDER_ARN }}
+  GITHUB_OIDC_PROVIDER_ARN: acs:ram::1883731481145107:oidc-provider/github-actions
   TEST_RELEASE_ROLE_ARN: ${{ vars.TEST_RELEASE_ROLE_ARN }}
 
 concurrency:
@@ -67,8 +67,7 @@ jobs:
           node --input-type=module <<'NODE'
           import { verifyTestReleaseOidcClaims } from './scripts/release/test-release-source.mjs';
           try {
-            if (process.env.TEST_RELEASE_OIDC_PROVIDER_ARN !== 'acs:ram::1883731481145107:oidc-provider/github-actions-huahuo-server' ||
-              process.env.TEST_RELEASE_ROLE_ARN !== 'acs:ram::1883731481145107:role/huahuo-agent-test-release') throw new Error();
+            if (process.env.TEST_RELEASE_ROLE_ARN !== 'acs:ram::1883731481145107:role/huahuo-agent-test-release') throw new Error();
             const url = new URL(process.env.ACTIONS_ID_TOKEN_REQUEST_URL);
             url.searchParams.set('audience', 'sts.aliyuncs.com');
             const response = await fetch(url, { headers: { authorization: 'Bearer ' + process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN }, signal: AbortSignal.timeout(10000), redirect: 'error' });
@@ -87,7 +86,7 @@ jobs:
         if: steps.candidate.outputs.deploy == 'true'
         uses: aliyun/configure-aliyun-credentials-action@1e5248c8d5d93a8781ac344a68e19a43341e79e6 # v1.1.0
         with:
-          oidc-provider-arn: ${{ env.TEST_RELEASE_OIDC_PROVIDER_ARN }}
+          oidc-provider-arn: ${{ env.GITHUB_OIDC_PROVIDER_ARN }}
           role-to-assume: ${{ env.TEST_RELEASE_ROLE_ARN }}
           audience: sts.aliyuncs.com
           role-session-expiration: 5400

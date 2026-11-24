@@ -51,7 +51,7 @@ pnpm release:check
 
 CI 不读取真实 .env 或 secrets，使用模拟模型、隔离内存适配器和云 API fixtures。`release:smoke` 只允许进程内的固定本地 health URL，4 秒上限和 4 KiB 响应限制；健康不代表 Server、认证业务、模型付费调用或数据库持久化已验证。
 
-GitHub test/production 仅允许 main 控制流程。OIDC Provider 复用已验证的 GitHub issuer（阿里云同一账号 issuer URL 唯一），Agent 使用独立 RAM 角色和精确 Agent 仓库/environment subject。角色只允许对确认的实例和 Agent 固定命令 InvokeCommand、DescribeInvocationResults；不新增长期 AK 或 GitHub token。正式生产尚未接入。
+GitHub test/production 仅允许 main 控制流程。工作流的 `GITHUB_OIDC_PROVIDER_ARN` 固定使用测试账号的共享 Provider `github-actions`，阿里云同一账号内 issuer URL 唯一。发布流程校验独立的 Agent RAM 角色和精确的 Agent 仓库/environment subject。该角色只允许对确认的实例和 Agent 固定命令使用 InvokeCommand、DescribeInvocationResults；不新增长期 AK 或 GitHub token。正式生产尚未接入。
 
 ## 统一入口切换候选（2026-11-16）
 
