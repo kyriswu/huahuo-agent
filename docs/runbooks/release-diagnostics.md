@@ -1,4 +1,6 @@
-# 轻量发布诊断
+# 轻量发布诊断历史记录
+
+本文记录已退役的 Agent Compose 发布及当时的故障证据。当前发布准备见[标准发布](standard-release.md)。
 
 现有发布命令、五阶段和失败结果保持原流程。宿主在执行检查时记录固定检查名；失败终态增加可选的 `diagnostic: { check, code, exitCode? }`。Actions 在同一 Job 中解析并显示检查项、静态说明和下一步，保留准确 invocationId，便于后续只读查询原调用。它不是模型推理或自动修复。
 
@@ -16,14 +18,10 @@
 
 已授权的只读诊断由执行任务的 Agent 自行完成，限制于固定测试机、本项目发布状态目录与本项目容器。临时人工排查可能产生额外只读云调用和等待，其成本与本表中的自动发布路径分别报告。一个本地 STS 获取失败不等于所有读取权限都不可用；在已有授权内核验其他入口，不创建长期凭据或扩大 workflow 角色。
 
-## 宿主接入
+## 历史宿主补丁
 
-仅调用器更新不能让旧宿主自动产生分类。配套 [release-diagnostics-host.patch](release-diagnostics-host.patch) 只修改 Agent 专用 `/usr/local/sbin/huahuo-agent-test-release` 的错误元数据和失败记录，净增加 32 行；不改子进程命令、执行顺序、预算、锁、恢复或重试策略。当前匹配的原文件 SHA256 为 `a75b96cf35dd1a9e885b58e64b2abe1b5d8487e1a4886a9fc207d15351feb96f`，候选为 `508a74aabcd0691ab9086b57d2317f3f1abcaa4e8aefd7879cd3b446a7f69f98`。
-
-先通过 main 的 PR/严格 CI，让调用器接受受限字段；再独立维护安装宿主补丁：核对原摘要和发布锁空闲、备份原文件、应用补丁、语法和摘要校验后原子替换。只影响 Agent 专用执行器，不重启应用或修改运行配置；原文件变化则停止，不盲目套用。测试包括 AST 语法、分类/退出码白名单，以及删除元数据赋值后 main AST 和全部 subprocess 调用 AST 与原版一致。实际安装结果另记，文件存在不代表已经生效。
+配套 [release-diagnostics-host.patch](release-diagnostics-host.patch) 记录当时的错误元数据和失败记录变更。原文件 SHA256 为 `a75b96cf35dd1a9e885b58e64b2abe1b5d8487e1a4886a9fc207d15351feb96f`，候选为 `508a74aabcd0691ab9086b57d2317f3f1abcaa4e8aefd7879cd3b446a7f69f98`。
 
 ## 本次故障证据
 
 原失败调用 `t-bj073dmjiybvx1c`（应用 `7ff73ae`）已结束于第一阶段。只读取回的本次 `run-20261117T104727-7ff73aea1213/release.log` 出现 Git 传输 `curl 56`、连接中断与 EOF；当时尚未进行构建、存储初始化或切换。后续只读 Git 引用查询成功；实际成功记录仍为 `8336740`，对应 Agent 容器 running/healthy。这是版本对象获取故障，不是由本地构建成功推断出的结论。
-
-新增调用器/测试属于 main 控制文件。控制代码同步到 test 不自动部署应用；在原调用终止、当前容器/成功基准和准确 CI 核对后，恢复使用显式 workflow_dispatch。恢复结果另以目标实测登记，不把准备或 CI 成功称为发布完成。
