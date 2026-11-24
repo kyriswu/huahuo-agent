@@ -89,7 +89,7 @@ jobs:
       AGENT_BUILD_INSTANCE_ID: ${{ vars.AGENT_BUILD_INSTANCE_ID }}
       AGENT_BUILD_COMMAND_ID: ${{ vars.AGENT_BUILD_COMMAND_ID }}
       GITHUB_OIDC_PROVIDER_ARN: acs:ram::1472289886746775:oidc-provider/github-actions
-      AGENT_BUILD_ROLE_ARN: ${{ vars.AGENT_BUILD_ROLE_ARN }}
+      GITHUB_OIDC_ROLE_ARN: acs:ram::1472289886746775:role/github-actions-release
       ALIBABA_CLOUD_IGNORE_PROFILE: 'TRUE'
       ALIBABA_CLOUD_CLI_PLUGIN_AUTO_INSTALL: 'false'
     outputs:
@@ -134,7 +134,7 @@ jobs:
         uses: aliyun/configure-aliyun-credentials-action@1e5248c8d5d93a8781ac344a68e19a43341e79e6 # v1.1.0
         with:
           oidc-provider-arn: ${{ env.GITHUB_OIDC_PROVIDER_ARN }}
-          role-to-assume: ${{ env.AGENT_BUILD_ROLE_ARN }}
+          role-to-assume: ${{ env.GITHUB_OIDC_ROLE_ARN }}
           audience: sts.aliyuncs.com
           role-session-expiration: 3600
           role-session-name: gha-${{ github.run_id }}-${{ github.run_attempt }}

@@ -10,7 +10,7 @@ const repository = 'kyriswu/huahuo-agent';
 const workflowRef = `${repository}/.github/workflows/agent-kubernetes-release.yml@refs/heads/main`;
 const expectedSubject = 'repo:kyriswu@5120703/huahuo-agent@1427064230:environment:test';
 const expectedProviderArn = 'acs:ram::1472289886746775:oidc-provider/github-actions';
-const testBuildRoleArn = /^acs:ram::1472289886746775:role\/[A-Za-z0-9._-]{1,64}$/u;
+const expectedRoleArn = 'acs:ram::1472289886746775:role/github-actions-release';
 const shaPattern = /^[a-f0-9]{40}$/u;
 const pending = new Set(['Pending', 'Running', 'Stopping']);
 const totalTimeoutMs = 25 * 60_000;
@@ -36,8 +36,7 @@ function cloudBuildConfig(env) {
 
 export async function verifyCloudBuildOidc(env = process.env, fetchImpl = fetch) {
   cloudBuildConfig(env);
-  const roleArn = env.AGENT_BUILD_ROLE_ARN ?? '';
-  if (env.GITHUB_OIDC_PROVIDER_ARN !== expectedProviderArn || testBuildRoleArn.exec(roleArn)?.[0] !== roleArn) {
+  if (env.GITHUB_OIDC_PROVIDER_ARN !== expectedProviderArn || env.GITHUB_OIDC_ROLE_ARN !== expectedRoleArn) {
     throw Error('AGENT_BUILD_CLOUD_ROLE_INVALID');
   }
 
