@@ -40,11 +40,13 @@ Agent Pod 带 `huahuo.io/api-trusted=true`，符合现有 Server K3s 模板的 A
 | GitHub 位置 | 所需配置 |
 | --- | --- |
 | 仓库变量 | `AGENT_IMAGE_REPOSITORY`（完整 ACR 地址/命名空间/仓库） |
-| `test` Environment 变量 | `AGENT_ACR_REGION_ID`（ECS 构建所在地域，当前为 `cn-beijing`）、`AGENT_BUILD_INSTANCE_ID`、`AGENT_BUILD_COMMAND_ID`、`AGENT_BUILD_OIDC_PROVIDER_ARN`、`AGENT_BUILD_ROLE_ARN` |
+| `test` Environment 变量 | `AGENT_ACR_REGION_ID`（ECS 构建所在地域，当前为 `cn-beijing`）、`AGENT_BUILD_INSTANCE_ID`、`AGENT_BUILD_COMMAND_ID`、`AGENT_BUILD_ROLE_ARN`（账号 `1472289886746775` 的专用构建角色） |
 | `test` 和 `production` Environment 变量 | `AGENT_K8S_CONTEXT` 与 `AGENT_K8S_NAMESPACE` |
 | `test` 和 `production` Environment Secret | `AGENT_KUBECONFIG`（已授权、有效期内的完整 kubeconfig） |
 
 北京 ACR 专有网络地址为 `huahuoai-docker-hub-registry-vpc.cn-beijing.cr.aliyuncs.com`。将 `AGENT_IMAGE_REPOSITORY` 设置为 `huahuoai-docker-hub-registry-vpc.cn-beijing.cr.aliyuncs.com/<acr-namespace>/<agent-repository>`，用实际的 ACR 命名空间和 Agent 仓库名替换占位符。ACR 命名空间和 Kubernetes namespace 分别配置。
+
+工作流的 `GITHUB_OIDC_PROVIDER_ARN` 固定为账号 `1472289886746775` 内的共享 Provider `github-actions`。
 
 ### 云助手构建机
 

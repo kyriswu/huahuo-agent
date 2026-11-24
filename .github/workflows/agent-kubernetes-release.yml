@@ -88,7 +88,7 @@ jobs:
       AGENT_ACR_REGION_ID: ${{ vars.AGENT_ACR_REGION_ID }}
       AGENT_BUILD_INSTANCE_ID: ${{ vars.AGENT_BUILD_INSTANCE_ID }}
       AGENT_BUILD_COMMAND_ID: ${{ vars.AGENT_BUILD_COMMAND_ID }}
-      AGENT_BUILD_OIDC_PROVIDER_ARN: ${{ vars.AGENT_BUILD_OIDC_PROVIDER_ARN }}
+      GITHUB_OIDC_PROVIDER_ARN: acs:ram::1472289886746775:oidc-provider/github-actions
       AGENT_BUILD_ROLE_ARN: ${{ vars.AGENT_BUILD_ROLE_ARN }}
       ALIBABA_CLOUD_IGNORE_PROFILE: 'TRUE'
       ALIBABA_CLOUD_CLI_PLUGIN_AUTO_INSTALL: 'false'
@@ -133,7 +133,7 @@ jobs:
       - name: Obtain temporary Cloud Assistant credentials
         uses: aliyun/configure-aliyun-credentials-action@1e5248c8d5d93a8781ac344a68e19a43341e79e6 # v1.1.0
         with:
-          oidc-provider-arn: ${{ env.AGENT_BUILD_OIDC_PROVIDER_ARN }}
+          oidc-provider-arn: ${{ env.GITHUB_OIDC_PROVIDER_ARN }}
           role-to-assume: ${{ env.AGENT_BUILD_ROLE_ARN }}
           audience: sts.aliyuncs.com
           role-session-expiration: 3600
