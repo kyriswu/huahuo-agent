@@ -31,6 +31,8 @@ Agent Pod 带 `huahuo.io/api-trusted=true`，符合现有 Server K3s 模板的 A
 
 ## GitHub 发布
 
+测试发布使用阿里云账号 `1472289886746775` 的 ACK 和 ACR。工作流须先进入受保护的 `main`，并配置相应的 GitHub Environment 与云端权限。
+
 1. 在受保护的 `main` 手动运行 **Agent Kubernetes release**，选择 `test`，在 `source_sha` 填入当前 `test` 的完整提交 SHA。流程核对同一 SHA 的成功 push CI，按 SHA 打包并推送到 ACR。
 2. 测试部署自动使用这次推送返回的 `sha256:...`。流程先做 Kubernetes 服务端 dry-run，再应用 NetworkPolicy 和工作负载，等待滚动更新，核对容器镜像并验证进程健康和匿名 API 401。记录 Actions 摘要中的源码 SHA、平台和镜像摘要。
 3. 验证测试环境的网关路径、Studio、持久化和业务链路。生产手动选择 `production`，在 `image_digest` 填入同一测试摘要，通过生产环境审批后从 ACR 拉取。生产应用关闭 Studio 页面和资源。
