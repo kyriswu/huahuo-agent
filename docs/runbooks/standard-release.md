@@ -42,19 +42,19 @@ Agent Pod 带 `huahuo.io/api-trusted=true`，符合现有 Server K3s 模板的 A
 | GitHub 位置 | 所需配置 |
 | --- | --- |
 | 仓库变量 | `AGENT_IMAGE_REPOSITORY`（完整 ACR 地址/命名空间/仓库） |
-| `test` Environment 变量 | `AGENT_ACR_REGION_ID`（ECS 构建所在地域，当前为 `cn-beijing`）、`AGENT_BUILD_INSTANCE_ID`、`AGENT_BUILD_COMMAND_ID`、`AGENT_BUILD_ROLE_ARN`（账号 `1472289886746775` 的专用构建角色） |
+| `test` Environment 变量 | `AGENT_ACR_REGION_ID`（ECS 构建所在地域，当前为 `cn-beijing`）、`AGENT_BUILD_INSTANCE_ID`、`AGENT_BUILD_COMMAND_ID` |
 | `test` 和 `production` Environment 变量 | `AGENT_K8S_CONTEXT` 与 `AGENT_K8S_NAMESPACE` |
 | `test` 和 `production` Environment Secret | `AGENT_KUBECONFIG`（已授权、有效期内的完整 kubeconfig） |
 
 北京 ACR 专有网络地址为 `huahuoai-docker-hub-registry-vpc.cn-beijing.cr.aliyuncs.com`。将 `AGENT_IMAGE_REPOSITORY` 设置为 `huahuoai-docker-hub-registry-vpc.cn-beijing.cr.aliyuncs.com/<acr-namespace>/<agent-repository>`，用实际的 ACR 命名空间和 Agent 仓库名替换占位符。ACR 命名空间和 Kubernetes namespace 分别配置。
 
-工作流的 `GITHUB_OIDC_PROVIDER_ARN` 固定为账号 `1472289886746775` 内的共享 Provider `github-actions`。
+工作流固定使用账号 `1472289886746775` 的共享 Provider `github-actions` 和共享发布角色 `github-actions-release`。
 
 ### 云助手构建机
 
 1. 将 `scripts/kubernetes` 中的 `cloud-build-agent-image.sh`、`acr-auth.sh` 和 `build-agent-image.sh` 从审核过的提交安装到构建节点 `/opt/huahuo-agent-build`。目录和文件由 root 管理。构建节点需要 `git`、`curl`、`jq`、`flock`、阿里云 CLI、ARM64 Docker 和 Buildx。专用 CLI 可放在同目录的 `bin/aliyun`。确认节点能访问 GitHub、构建依赖和 ACR VPC 端点。
 2. 在同一目录用 root 创建 `config.json`，将 `region`、`ecsInstanceId`、`instanceId`、`imageRepository` 和 `ramRoleName` 分别设为地域、构建 ECS 实例 ID、ACR 企业版实例 ID、完整私有仓库地址和 ECS 实例角色名称。实例角色只需读取指定构建命令的调用记录、查询指定 ACR 仓库和推送权限，以及换取短期 ACR 凭据。实例身份通过 IMDSv2 获取。 [云助手权限](https://www.alibabacloud.com/help/en/ecs/user-guide/use-ram-to-implement-permission-control) · [ECS 实例角色](https://www.alibabacloud.com/help/en/ecs/user-guide/attach-an-instance-ram-role-to-an-ecs-instance) · [ACR RAM 权限](https://www.alibabacloud.com/help/en/acr/user-guide/ram-authorization-information)
-3. 注册固定 Shell 命令，启用下列云助手内置变量，执行超时 20 分钟。仅允许受保护的 `main` 使用 GitHub `test` Environment。OIDC 角色绑定 GitHub 发行方、`sts.aliyuncs.com` 受众和 `repo:kyriswu@5120703/huahuo-agent@1427064230:environment:test`。调用和结果读取权限限定为该命令和该实例，调用的 `ecs:CommandRunAs` 固定为 `root`。 [GitHub 环境分支限制](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments#deployment-branches-and-tags) · [云助手内置变量](https://www.alibabacloud.com/help/en/ecs/user-guide/use-custom-parameters-in-cloud-assistant-commands)
+3. 注册固定 Shell 命令，启用下列云助手内置变量，执行超时 20 分钟。仅允许受保护的 `main` 使用 GitHub `test` Environment。共享角色对 Agent 的信任需匹配 GitHub 发行方、`sts.aliyuncs.com` 受众和 `repo:kyriswu@5120703/huahuo-agent@1427064230:environment:test`。将 Agent 构建所需的调用和结果读取权限限定为该命令和该实例，调用的 `ecs:CommandRunAs` 固定为 `root`。 [GitHub 环境分支限制](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments#deployment-branches-and-tags) · [云助手内置变量](https://www.alibabacloud.com/help/en/ecs/user-guide/use-custom-parameters-in-cloud-assistant-commands)
 
 ```bash
 exec /usr/bin/env -i /bin/bash -p /opt/huahuo-agent-build/cloud-build-agent-image.sh '{{ACS::InvokeId}}' '{{ACS::CommandId}}'

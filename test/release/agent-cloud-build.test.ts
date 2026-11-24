@@ -92,7 +92,7 @@ describe('Cloud Assistant build OIDC precheck', () => {
   const env = {
     ...target,
     GITHUB_OIDC_PROVIDER_ARN: 'acs:ram::1472289886746775:oidc-provider/github-actions',
-    AGENT_BUILD_ROLE_ARN: 'acs:ram::1472289886746775:role/agent-builder',
+    GITHUB_OIDC_ROLE_ARN: 'acs:ram::1472289886746775:role/github-actions-release',
     GITHUB_REPOSITORY: repo,
     GITHUB_REF: 'refs/heads/main',
     GITHUB_REF_PROTECTED: 'true',
@@ -127,7 +127,7 @@ describe('Cloud Assistant build OIDC precheck', () => {
     await expect(verifyCloudBuildOidc(env, request({ workflow_ref: `${repo}/other.yml` })))
       .rejects.toThrow('AGENT_BUILD_CLOUD_OIDC_NOT_VERIFIED');
     const fetch = request();
-    await expect(verifyCloudBuildOidc({ ...env, AGENT_BUILD_ROLE_ARN: 'acs:ram::9876543210123456:role/agent-builder' }, fetch))
+    await expect(verifyCloudBuildOidc({ ...env, GITHUB_OIDC_ROLE_ARN: 'acs:ram::9876543210123456:role/github-actions-release' }, fetch))
       .rejects.toThrow('AGENT_BUILD_CLOUD_ROLE_INVALID');
     expect(fetch).not.toHaveBeenCalled();
   });
@@ -136,10 +136,12 @@ describe('Cloud Assistant build OIDC precheck', () => {
     { GITHUB_OIDC_PROVIDER_ARN: 'acs:ram::1472289886746775:oidc-provider/other' },
     {
       GITHUB_OIDC_PROVIDER_ARN: 'acs:ram::1234567890123456:oidc-provider/github-actions',
-      AGENT_BUILD_ROLE_ARN: 'acs:ram::1234567890123456:role/agent-builder',
+      GITHUB_OIDC_ROLE_ARN: 'acs:ram::1234567890123456:role/github-actions-release',
     },
-    { AGENT_BUILD_ROLE_ARN: 'acs:ram::1472289886746775:role/agent-builder\n' },
-  ])('rejects any other provider and invalid test role ARNs (%j)', async (patch) => {
+    { GITHUB_OIDC_ROLE_ARN: 'acs:ram::1472289886746775:role/another-role' },
+    { GITHUB_OIDC_ROLE_ARN: 'acs:ram::1472289886746775:role/github-actions-release\n' },
+    { GITHUB_OIDC_ROLE_ARN: undefined },
+  ])('requires the exact shared provider and release role (%j)', async (patch) => {
     const fetch = request();
     await expect(verifyCloudBuildOidc({ ...env, ...patch }, fetch)).rejects.toThrow('AGENT_BUILD_CLOUD_ROLE_INVALID');
     expect(fetch).not.toHaveBeenCalled();
