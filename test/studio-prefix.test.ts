@@ -4,8 +4,15 @@ import { dirname, join } from 'node:path';
 import { Script } from 'node:vm';
 import { describe, expect, it } from 'vitest';
 import { adaptStudioHtml } from '../src/studio/public-prefix.js';
+import { agentPublicPath } from '../src/studio/config.js';
 
 describe('installed Mastra Studio prefix contract', () => {
+  it.each(['/api', '/internal/tools', '/health', '/studio-login', '/studio-auth', '/swagger-ui'])(
+    'rejects a Studio prefix that would shadow an Agent route (%s)', path => {
+      expect(() => agentPublicPath({ HUAHUO_AGENT_PUBLIC_PATH: path })).toThrow('PUBLIC_PATH_INVALID');
+    },
+  );
+
   it('adapts the installed official runtime configuration without rewriting assets', async () => {
     const cli = createRequire(import.meta.url).resolve('mastra');
     const source = await readFile(join(dirname(cli), 'studio/index.html'), 'utf8');

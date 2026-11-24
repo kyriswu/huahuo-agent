@@ -93,15 +93,11 @@ validated by its own maintenance process.
 
 ## Independent release
 
-Agent releases independently. Before replacing Agent, its executor verifies the
-configured Server readiness and admission contract. It does not read Server Git
-refs, release records or containers. A missing/incompatible dependency blocks
-the release before Mastra storage initialization or stopping the current Agent. Remove Agent `APP_JWT_*` and both directional `HUAHUO_*_API_KEY`
-settings. Server retains its JWT issuance/verification keys for its admission endpoint.
-The host keeps Nginx, certificates, routing and upstream selection outside both
-application repositories. Server and Agent keep their own application listeners
-and existing data connections. Local code changes do not install or reload the
-host ingress.
+Agent releases independently in Kubernetes. Its init container checks the
+configured Server readiness and admission contract before Mastra initializes
+storage. The existing gateway owns certificates, routing, and trusted header
+injection. The Agent Service remains private. See
+[Kubernetes release](../../docs/runbooks/standard-release.md).
 
 Nginx auth subrequests receive only 204/401/403 (or fail-closed 5xx). Server
 returns a separate login redirect hint on denied Studio HTML navigation and

@@ -19,10 +19,12 @@ export function adaptStudioHtml(html: string, publicPath: string): string {
   return html;
 }
 
-export function createStudioPrefixMiddleware(publicPath: string): Middleware {
+export function createStudioPrefixMiddleware(publicPath: string, studioEnabled = true): Middleware {
   return async (c, next) => {
+    const isStudioPath = c.req.path === publicPath || c.req.path.startsWith(`${publicPath}/`);
+    if (isStudioPath && !studioEnabled) return new Response(null, { status: 404 });
     await next();
-    if (!(c.req.path === publicPath || c.req.path.startsWith(`${publicPath}/`)) || c.req.method !== 'GET'
+    if (!isStudioPath || c.req.method !== 'GET'
       || !c.res.ok || !c.res.headers.get('content-type')?.includes('text/html')) return;
     try {
       const html = adaptStudioHtml(await c.res.text(), publicPath);

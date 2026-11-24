@@ -54,6 +54,22 @@ afterEach(() => {
 });
 
 describe('Mastra runtime compatibility', () => {
+  it.each([
+    ['', 'false', 'MASTRA_POSTGRES_PASSWORD_REQUIRED'],
+    ['fixture-password', 'true', 'MASTRA_STORAGE_INIT_REQUIRED'],
+  ])('refuses to start when required Kubernetes storage is unavailable (%#)', async (password, disabled, code) => {
+    vi.resetModules();
+    vi.stubEnv('METRICS_ENABLED', 'false');
+    vi.stubEnv('MASTRA_POSTGRES_REQUIRED', 'true');
+    vi.stubEnv('MASTRA_POSTGRES_PASSWORD', password);
+    vi.stubEnv('MASTRA_DISABLE_STORAGE_INIT', disabled);
+    try {
+      await expect(import('../src/mastra/index.ts')).rejects.toThrow(code);
+    } finally {
+      vi.resetModules();
+    }
+  });
+
   it('runs HuoX through the custom gateway and RAG tool, and recalls persisted conversation history', async () => {
     const modelBaseUrl = 'http://127.0.0.1:44111/v1';
     const serverBaseUrl = 'http://127.0.0.1:44112';

@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: huahuo-agent
+spec:
+  template:
+    spec:
+      initContainers: null
+      containers:
+        - name: agent
+          imagePullPolicy: Never
+          envFrom: null
+          env:
+            - name: APP_ENV
+              value: development
+            - name: HUAHUO_SERVER_BASE_URL
+              value: http://127.0.0.1:1
+            - name: HUAHUO_STUDIO_AUTH_ENABLED
+              value: "false"
+            - name: MASTRA_POSTGRES_PASSWORD
+              value: ""
+            - name: MASTRA_POSTGRES_REQUIRED
+              value: "false"
+            - name: METRICS_ENABLED
+              value: "false"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 192Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

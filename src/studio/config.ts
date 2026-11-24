@@ -6,10 +6,14 @@ export interface StudioLoginConfig {
   privacyVersion: string;
 }
 
+const reservedAgentPaths = new Set(['api', 'internal', 'health', 'studio-login', 'studio-auth', 'swagger-ui']);
+
 /** Public browser prefix; internal business API routes remain /api. */
 export function agentPublicPath(env: NodeJS.ProcessEnv = process.env): string {
   const path = (env.HUAHUO_AGENT_PUBLIC_PATH?.trim() || '/agent').replace(/\/$/u, '');
-  if (!/^\/[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/u.test(path)) throw new Error('HUAHUO_AGENT_PUBLIC_PATH_INVALID');
+  if (!/^\/[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/u.test(path) || reservedAgentPaths.has(path.split('/')[1].toLowerCase())) {
+    throw new Error('HUAHUO_AGENT_PUBLIC_PATH_INVALID');
+  }
   return path;
 }
 
