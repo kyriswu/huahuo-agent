@@ -11,7 +11,7 @@ Mastra 的类型、上下文、注册和生命周期留在运行时集成层；�
 发布准备使用 `.agents/skills/huahuo-release/SKILL.md` 和 `docs/runbooks/standard-release.md`。
 本地开发分支为 `test`，业务通过 PR 合入 test。Kubernetes 镜像构建和发布由受保护 main 手动触发。main 由 owner 合并。
 实际权限以 GitHub rulesets/environment 为准，不把仓库文件存在当成已生效。
-发布目标为已授权 Kubernetes context 和 namespace 内的 Agent 资源。Server、入口网关及证书由各自部署流程管理。
+测试发布目标为阿里云账号 `1472289886746775` 内已授权的 Agent ACK context 和 namespace。Server、入口网关及证书由各自部署流程管理。
 
 Mastra PostgreSQL 表由框架启动时管理；不能把旧的 `migrations/` RAG SQL 当成运行服务迁移自动执行。
 发布基准取目标 Deployment 实际运行的镜像摘要。
