@@ -1,4 +1,3 @@
-import type { SearchMode } from '../../../contracts/rag-search.ts';
 import { RagConfigurationError } from './errors.ts';
 
 export interface RagEmbeddingConfig {
@@ -30,13 +29,6 @@ export interface RagRuntimeConfig {
   chunking: RagChunkingConfig;
   ingest: RagIngestConfig;
   stateDatabaseUrl?: string;
-  searchMode: SearchMode;
-  rerank: {
-    enabled: boolean;
-    baseUrl?: string;
-    apiKey?: string;
-    model?: string;
-  };
 }
 
 function positiveInteger(
@@ -91,11 +83,6 @@ function optionalDimensions(env: NodeJS.ProcessEnv): number | undefined {
 
 /** Read RAG settings without logging or exposing credential values. */
 export function loadRagConfig(env: NodeJS.ProcessEnv = process.env): RagRuntimeConfig {
-  const searchMode = env.RAG_SEARCH_MODE?.trim() || 'semantic';
-  if (searchMode !== 'keyword' && searchMode !== 'semantic' && searchMode !== 'hybrid') {
-    throw new RagConfigurationError('RAG_SEARCH_MODE must be one of "keyword", "semantic", or "hybrid"');
-  }
-
   const maxTokens = positiveInteger(env, 'RAG_CHUNK_SIZE', 800);
   const overlapTokens = nonNegativeInteger(env, 'RAG_CHUNK_OVERLAP', 120);
   if (overlapTokens >= maxTokens) {
@@ -123,13 +110,6 @@ export function loadRagConfig(env: NodeJS.ProcessEnv = process.env): RagRuntimeC
       pipelineVersion: env.RAG_INDEX_PIPELINE_VERSION?.trim() || 'v1',
     },
     ...(env.RAG_STATE_DATABASE_URL ? { stateDatabaseUrl: env.RAG_STATE_DATABASE_URL.trim() } : {}),
-    searchMode,
-    rerank: {
-      enabled: env.RAG_RERANK_ENABLED === 'true',
-      ...(env.RAG_RERANK_BASE_URL ? { baseUrl: env.RAG_RERANK_BASE_URL } : {}),
-      ...(env.RAG_RERANK_API_KEY ? { apiKey: env.RAG_RERANK_API_KEY } : {}),
-      ...(env.RAG_RERANK_MODEL ? { model: env.RAG_RERANK_MODEL } : {}),
-    },
   };
 }
 

@@ -6,8 +6,7 @@ import {currentTraceId,withTraceId} from '../src/trace.js';
 import {traceMiddleware} from '../src/request-trace.js';
 import {traceLogger} from '../src/logging.js';
 import {RagClient} from '../src/server/rag-client.js';
-import {RequestContext} from '@mastra/core/request-context';
-import {applyTrustedIdentity,readTrustedIdentity} from '../src/auth/trusted-identity.js';
+import {readTrustedIdentity} from '../src/auth/trusted-identity.js';
 import {StudioIdentityClient} from '../src/studio/identity-client.js';
 import {createStudioGateway} from '../src/studio/gateway.js';
 import {ChatGPTOpenAIGateway} from '../src/mastra/gateways/chatgpt-openai-gateway.js';
@@ -39,9 +38,8 @@ describe('simple Agent request correlation',()=>{
   const app=new Hono();app.use('*',traceMiddleware as MiddlewareHandler);
   app.on('GET','/test',async c=>{
    await pause(c.req.header('x-trace-id')==='trace-first'?10:1);
-   const requestContext=new RequestContext();
-   applyTrustedIdentity(requestContext,readTrustedIdentity({'x-huahuo-user-id':'11111111-1111-4111-8111-111111111111','x-huahuo-session-id':'22222222-2222-4222-8222-222222222222','x-huahuo-auth-method':'bearer','x-trace-id':currentTraceId()}));
-   await new RagClient({baseUrl:'http://server.test',requestContext}).query({query:'trace'});
+   const identity=readTrustedIdentity({'x-huahuo-user-id':'11111111-1111-4111-8111-111111111111','x-huahuo-session-id':'22222222-2222-4222-8222-222222222222','x-huahuo-auth-method':'bearer','x-trace-id':currentTraceId()});
+   await new RagClient({baseUrl:'http://server.test',identity}).query({query:'trace'});
    return c.json({traceId:currentTraceId()});
   });
   const results=await Promise.all(['trace-first','trace-second'].map(id=>app.request('/test',{headers:{'x-trace-id':id}})));
@@ -62,7 +60,7 @@ describe('simple Agent request correlation',()=>{
   vi.spyOn(console,'info').mockImplementation(()=>undefined);
   const seen:string[]=[];
   vi.stubGlobal('fetch',vi.fn<typeof fetch>(async(_url,init)=>{seen.push(new Headers(init?.headers).get('x-trace-id')!);return Response.json({success:true,data:{smsRequestId:'11111111-1111-4111-8111-111111111111',cooldownSeconds:60},traceId:'server-trace'});}));
-  const gateway=createStudioGateway({enabled:true,origin:'http://studio.test',publicPath:'/agent',agreementVersion:'test',privacyVersion:'test'},new StudioIdentityClient('http://server.test'));
+  const gateway=createStudioGateway({enabled:true,origin:'http://studio.test',publicPath:'/agent',agreementVersion:'test',privacyVersion:'test'},new StudioIdentityClient({baseUrl:'http://server.test'}));
   const route=gateway.routes.find(value=>value.path==='/studio-auth/sms-code');if(!route||!('handler' in route))throw Error('TEST_ROUTE_MISSING');
   const app=new Hono();app.on('POST',route.path,route.handler as Handler);
   const response=await app.request('http://studio.test/studio-auth/sms-code',{method:'POST',headers:{origin:'http://studio.test','content-type':'application/json','x-trace-id':'login-original'},body:JSON.stringify({phone:'13800000001',requestId:'22222222-2222-4222-8222-222222222222'})});

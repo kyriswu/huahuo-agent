@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 import {
   EmbeddingProviderError,
@@ -22,6 +23,21 @@ const options = {
 };
 
 describe('OpenAICompatibleEmbeddingClient', () => {
+  it('loads the embedding check with native Node TypeScript and reports missing configuration', () => {
+    const script = new URL('../../scripts/rag-embedding-check.ts', import.meta.url);
+    // Bypass Vite's .js-to-.ts resolution without loading .env or calling a provider.
+    const result = spawnSync(process.execPath, [
+      '--experimental-strip-types', '--input-type=module', '--eval',
+      `globalThis.fetch = () => { throw new Error('UNEXPECTED_NETWORK'); }; await import(${JSON.stringify(script.href)});`,
+    ], { env: {}, encoding: 'utf8', timeout: 5_000 });
+
+    expect(result.error).toBeUndefined();
+    expect(result.status, result.stderr).toBe(2);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      ok: false, status: 'BLOCKED', exitCode: 2, errorKind: 'configuration',
+    });
+  });
+
   it('sends a batch request and validates the ordered response', async () => {
     let request: RequestInit | undefined;
     const client = new OpenAICompatibleEmbeddingClient({

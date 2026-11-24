@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ServerHttpClient, ServerRequestError } from '../server/http-client.js';
+import { ServerHttpClient, ServerRequestError, type ServerHttpClientOptions } from '../server/http-client.js';
 
 export class StudioLoginError extends Error {
   constructor(readonly code: string, readonly status = 401) { super(code); }
@@ -32,8 +32,8 @@ export interface StudioLoginInput {
 export class StudioIdentityClient {
   private readonly http: ServerHttpClient;
 
-  constructor(baseUrl?: string) {
-    this.http = new ServerHttpClient({ baseUrl });
+  constructor(options?: ServerHttpClientOptions) {
+    this.http = new ServerHttpClient(options);
   }
 
   async sendCode(phone: string, requestId: string, signal?: AbortSignal) {

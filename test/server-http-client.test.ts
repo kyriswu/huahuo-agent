@@ -1,9 +1,8 @@
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { RequestContext } from '@mastra/core/request-context';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { applyTrustedIdentity, readTrustedIdentity } from '../src/auth/trusted-identity.js';
+import { readTrustedIdentity } from '../src/auth/trusted-identity.js';
 import { ServerHttpClient, ServerRequestError } from '../src/server/http-client.js';
 import { withTraceId } from '../src/trace.js';
 
@@ -13,15 +12,13 @@ const anonymous = { authentication: 'none' as const };
 const userId = 'a0000000-0000-4000-8000-000000000001';
 const sessionId = 'c0000000-0000-4000-8000-000000000003';
 
-function context() {
-  const value = new RequestContext();
-  applyTrustedIdentity(value, readTrustedIdentity({
+function identity() {
+  return readTrustedIdentity({
     'x-huahuo-user-id': userId,
     'x-huahuo-session-id': sessionId,
     'x-huahuo-auth-method': 'bearer',
     'x-trace-id': 'trusted-trace',
-  }));
-  return value;
+  });
 }
 
 function client(fetchImpl: typeof fetch) {
@@ -33,7 +30,7 @@ afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 describe('shared Server HTTP transport', () => {
   it('unwraps validated data and sends only trusted identity headers', async () => {
     const request = vi.fn<typeof fetch>(async () => Response.json(envelope()));
-    await expect(client(request).post('/internal/v1/rag/query', { query: 'hello' }, dataSchema, { requestContext: context() })).resolves.toEqual({ value: 'ok' });
+    await expect(client(request).post('/internal/v1/rag/query', { query: 'hello' }, dataSchema, { identity: identity() })).resolves.toEqual({ value: 'ok' });
     expect(request).toHaveBeenCalledOnce();
     const [url, init] = request.mock.calls[0];
     expect(url).toBe('http://server.test/internal/v1/rag/query');
@@ -49,9 +46,10 @@ describe('shared Server HTTP transport', () => {
 
   it('requires verified identity before invoking the transport', async () => {
     const request = vi.fn<typeof fetch>();
-    const untrusted = new RequestContext();
-    untrusted.set('user', { userId, sessionId, authMethod: 'bearer' });
-    await expect(client(request).post('/internal/v1/rag/query', {}, dataSchema, { requestContext: untrusted })).rejects.toThrow('TRUSTED_IDENTITY_REQUIRED');
+    await expect(client(request).post('/internal/v1/rag/query', {}, dataSchema)).rejects.toThrow('TRUSTED_IDENTITY_REQUIRED');
+    await expect(client(request).post('/internal/v1/rag/query', {}, dataSchema, {
+      identity: { ...identity(), sessionId: 'invalid' },
+    })).rejects.toThrow('TRUSTED_IDENTITY_INVALID');
     expect(request).not.toHaveBeenCalled();
   });
 

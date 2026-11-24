@@ -13,9 +13,7 @@ RUN pnpm install --frozen-lockfile
 COPY tsconfig.json ./
 COPY src ./src
 COPY skills ./skills
-COPY scripts/release/smoke.mjs ./release/smoke.mjs
-COPY scripts/release/server-preflight.mjs scripts/release/runtime-check.mjs ./release/
-COPY scripts/release/changes ./release/changes
+COPY scripts/release/smoke.mjs scripts/release/server-preflight.mjs scripts/release/runtime-check.mjs scripts/release/kubernetes-preflight.mjs ./release/
 ARG MASTRA_BUILD_STUDIO=true
 RUN export NODE_OPTIONS=--max-old-space-size=768 \
     npm_config_network_concurrency=4 \
@@ -35,6 +33,7 @@ ENV NODE_ENV=production \
     APP_ENV=production \
     MASTRA_HOST=0.0.0.0 \
     PORT=4111 \
+    MASTRA_SKIP_DOTENV=true \
     MASTRA_TELEMETRY_DISABLED=1
 
 COPY --from=build --chown=node:node /app/.mastra/output/ ./

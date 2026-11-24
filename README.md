@@ -219,24 +219,19 @@ These tests do not establish autonomous learning quality, user-confirmation
 judgment, PostgreSQL cross-process concurrency, or native version-history
 equivalence.
 
-## Knowledge search direction
+## Knowledge search
 
-Search orchestration depends on the provider contract in
-`src/contracts/rag-search.ts` and supports `keyword`, `semantic`, and `hybrid`
-modes. The concrete vector backend is intentionally left behind an adapter
-boundary; this project does not ship a direct vector-database SDK or make
-external vector-store connections during startup.
+HuoX's knowledge tool sends `keyword`, `dense`, or `hybrid` queries to
+the private Server RAG endpoint. Server selects the active index and authorized
+sources. Agent validates the request and response and forwards the verified
+identity and cancellation signal. [Server integration](src/server/README.md)
 
-Reranking is an optional injected `Reranker`. It is disabled by default, and
-configured reranker errors are propagated to the caller.
-
-## RAG indexing foundation
+## Standalone RAG indexing tools
 
 The indexing core provides Markdown normalization and chunking, an
 OpenAI-compatible Embedding client, idempotent document-version state, and a
-PostgreSQL canonical chunk-content store. `RagChunkRepositoryPort` is the
-generic boundary for a future vector index implementation. No production
-vector-store command is enabled until that adapter is selected.
+PostgreSQL canonical chunk-content store. The mock flows use an in-memory
+implementation of `RagChunkRepositoryPort` to exercise index writes.
 
 Run the local checks and deterministic mock flow with:
 
@@ -286,20 +281,23 @@ not write to an external vector index.
 Volta is a prerequisite and must manage the project's Node.js and npm
 versions. pnpm is the package manager declared by the repository.
 
-The Mastra packages are pinned to the November 12, 2026 release:
+The Mastra packages are pinned in `package.json` and `pnpm-lock.yaml`:
 
 | Package | Version |
 | --- | --- |
-| `@mastra/core` | `1.83.0` |
-| `@mastra/editor` | `0.17.1` |
-| `@mastra/memory` | `1.41.1` |
-| `@mastra/pg` | `1.36.0` |
-| `mastra` CLI | `1.39.0` |
+| `@mastra/core` | `1.85.0` |
+| `@mastra/server` | `1.85.0` |
+| `@mastra/editor` | `0.17.2` |
+| `@mastra/memory` | `1.41.2` |
+| `@mastra/observability` | `1.24.2` |
+| `@mastra/otel-bridge` | `1.6.1` |
+| `@mastra/pg` | `1.37.0` |
+| `mastra` CLI | `1.40.1` |
 
 Update these packages together and commit `pnpm-lock.yaml` with the version
 changes. Validate upgrades with `pnpm run typecheck`, `pnpm test`,
-`pnpm run build`, and `pnpm run rag:acceptance:dense:mock`. Stop the development
-server before building, because both commands use `.mastra/output`.
+`pnpm build --studio`, `pnpm test:studio:built`, and `pnpm run rag:acceptance:dense:mock`.
+Stop the development server before building, because both commands use `.mastra/output`.
 
 ```bash
 pnpm install
@@ -312,7 +310,7 @@ Mastra Studio is served at <http://localhost:4111> by the Mastra development com
 
 ### Agent Editor
 
-`@mastra/editor@0.17.1` is registered on the Mastra instance. Open **Agents → HuoX → Editor**
+`@mastra/editor` is registered on the Mastra instance. Open **Agents → HuoX → Editor**
 to edit instructions and select project tools. HuoX and the weather example keep their
 code-defined instructions and tools as defaults; the Editor supports stored overrides.
 The RAG, weather, and DeepSeek web tools are registered on Mastra so they are
@@ -421,111 +419,28 @@ framework's subpath support; no package files are patched. See the
 [identity contract](src/server/README.md) for independent release configuration and
 upgrade verification. Phone login remains disabled in production.
 
-## Docker service
+## Local containers
 
-Docker reads the project's `.env` file. For a new checkout, create it from
-the example:
+Ordinary development uses `pnpm dev`. For a local Docker service, copy
+`.env.example` to `.env`, set the local Server origin if needed, and run
+`docker compose up -d --build`. The host ports default to loopback. Docker
+Compose reads raw env files, so keep values unquoted. Stop it with
+`docker compose down`.
 
-```bash
-cp .env.example .env
-```
+A local Agent can use in-memory storage by leaving
+`MASTRA_POSTGRES_PASSWORD` empty. Set the PostgreSQL host, database, user,
+and password together for persistence. An API-only build with
+`MASTRA_BUILD_STUDIO=false` omits Studio assets.
 
-The service configuration covers DeepSeek, the model gateway, Server address and trusted identity settings,
-Docker/Studio, and Mastra PostgreSQL/Memory. RAG parsing, chunking, embedding,
-and reranking belong to `huahuo-server`. The older standalone RAG scripts in
-this repository require explicit `RAG_*` configuration when invoked; those
-settings are omitted from the Agent service's `.env` and example file.
+## Kubernetes release
 
-Set the Server URL, JWKS URL, two distinct directional Service Keys (at least
-43 characters each), and the model API key. Configure `MASTRA_POSTGRES_*` to
-persist conversations; without a PostgreSQL password, storage is in memory and
-is lost on restart. `PostgresStore` initializes and upgrades its tables on
-startup, so the configured database user needs the corresponding permissions.
-
-Build and start the service:
-
-```bash
-docker build -t huahuo-agent:local .
-docker compose up -d --no-build
-docker compose ps
-docker compose logs -f agent
-```
-
-If `HUAHUO_AGENT_TAG` is set in `.env`, build the image with that tag instead
-of `local`.
-
-The image includes Studio by default. Set `MASTRA_STUDIO_PATH=/app/studio`
-and `HUAHUO_AGENT_PUBLIC_PATH=/agent` in `.env`, then open `/agent/` on the shared
-Nginx origin. Studio uses native `studioBase` for its pages and assets; a small
-application middleware sets its browser API prefix to `/agent/api`. Internal API
-routes remain `/api`; health remains `/health`. The installed Studio template is
-checked by `test/studio-prefix.test.ts` on Mastra upgrades.
-
-All user APIs require trusted gateway identity in every environment.
-`APP_ENV` in `.env` controls whether the test phone-login UI can be enabled. Test Studio uses
-`development` or `test` with `HUAHUO_STUDIO_AUTH_ENABLED=true`; keep this local
-configuration bound to `127.0.0.1`. Production uses `APP_ENV=production`,
-`HUAHUO_STUDIO_AUTH_ENABLED=false`, and an API-only image. Compose defaults to
-`production` when `APP_ENV` is absent. The container continues to run the
-compiled server with `NODE_ENV=production` in either case.
-
-For an API-only image, set `MASTRA_BUILD_STUDIO=false` in `.env` and rebuild:
-
-```bash
-docker build --build-arg MASTRA_BUILD_STUDIO=false -t huahuo-agent:local .
-docker compose up -d --no-build
-```
-
-`docker compose build` also reads this build argument from `.env` when Docker
-Buildx is installed. Studio consists of static browser assets; bundling it
-increases image size. Serving or using the UI adds HTTP requests, and using
-its debugging tools runs the corresponding API operations.
-
-If the development server already uses port 4111, choose another host port:
-
-```bash
-AGENT_PORT=4112 docker compose up -d --no-build
-```
-
-By default the published port binds to `127.0.0.1`. Use a restricted private bind address and source access controls when trusted
-ingress needs to reach Agent from another host.
-These Compose variables can be supplied in the shell or `.env`.
-The runtime env file uses Compose's `raw` format (Compose 2.30 or later), so
-write values without surrounding quotes; dollar signs in passwords and keys
-are preserved.
-
-The Server and PostgreSQL run separately. Set `HUAHUO_SERVER_BASE_URL` to the
-stable private origin maintained by the deployment, without `/api` or `/agent`.
-Public and internal API traffic must follow the same selected Server instance
-when a release switches. Do not pin Agent to a temporary release container.
-
-The Agent may keep its own Docker network. Use the existing shared network only
-when that deployment requires it; a stable private IP and port work across
-hosts. Keep the Agent listener restricted to trusted ingress/internal callers.
-A `localhost` URL inside the Agent container points back to Agent itself.
-
-The image uses Node.js `26.12.1` (within the project's Node.js 26 engine range),
-is built from locked dependencies in a separate build stage, and runs as the
-non-root `node` user. Runtime configuration files, host
-`node_modules`, `.mastra`, and repository metadata are excluded from the build
-context. No host directory or database is mounted into the container.
-The `/health` endpoint checks the HTTP process; it does not test the model,
-business Server, or PostgreSQL connection.
-
-Stop the service with:
-
-```bash
-docker compose down
-```
-
-## Git release workflow
-
-Development uses `test`; PRs merge after the required `Agent CI` through native
-GitHub Auto-merge. Successful push CI for the exact test SHA triggers the release
-workflow from protected `main`. main merges remain owner-controlled; production
-only prepares a release summary and retains the owner approval gate.
-See [team releases](docs/runbooks/team-releases.md) and the
-[standard release procedure](docs/runbooks/standard-release.md).
+Online test and production use Kubernetes and Alibaba Cloud ACR. The manual
+release on protected `main` builds a passing `test` commit, pushes to ACR,
+and updates the test Deployment by digest. Production uses the approved test
+digest. Code merges run CI. The local K3s overlay uses one API-only
+Agent pod with in-memory storage and no cloud dependencies.
+See [Kubernetes release and local smoke](docs/runbooks/standard-release.md)
+and [team releases](docs/runbooks/team-releases.md).
 
 ## Unified identity and single-domain routing
 

@@ -1,4 +1,6 @@
 import { createTool } from '@mastra/core/tools';
+import { getTrustedIdentity } from '../../auth/mastra-auth.js';
+import { logger } from '../../logging.js';
 import { RagClient, ragQueryInputSchema, ragQueryOutputSchema } from '../../server/rag-client.js';
 
 export const huahuoRagQueryTool = createTool({
@@ -8,7 +10,7 @@ export const huahuoRagQueryTool = createTool({
   inputSchema: ragQueryInputSchema,
   outputSchema: ragQueryOutputSchema,
   execute: async (input, context) => {
-    const client = new RagClient({ requestContext: context.requestContext });
+    const client = new RagClient({ identity: getTrustedIdentity(context.requestContext), logger });
     return client.query(input, context.abortSignal);
   },
 });
