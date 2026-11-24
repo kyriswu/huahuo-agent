@@ -20,8 +20,8 @@ describe('native test deployment intent (read-only API fixtures)', () => {
     const f = fixture([{ filename: 'docs/release.md' }, { filename: '.github/CODEOWNERS' }, { filename: '.agents/skills/huahuo-release/SKILL.md' }, { filename: 'scripts/release/test-release-trigger.mjs' }, { filename: '.github/workflows/agent-ci.yml' }, { filename: 'scripts/release/release-plan.mjs' }, { filename: 'test/release/release-plan.test.ts' }]);
     await expect(testReleaseIntent(context(), f.read)).resolves.toEqual({ deploy: false, reason: 'no-application-change' });
   });
-  it('skips a reviewed caller-only sync while checking its rename source for application changes', async () => {
-    const files = [{ filename: 'scripts/release/invoke-cloud-release.mjs' }, { filename: 'test/release/cloud-release.test.ts' }];
+  it('skips a release control sync while checking its rename source for application changes', async () => {
+    const files = [{ filename: 'scripts/release/test-release-source.mjs' }, { filename: 'test/release/test-release-source.test.ts' }];
     await expect(testReleaseIntent(context(), fixture(files).read)).resolves.toEqual({ deploy: false, reason: 'no-application-change' });
     await expect(testReleaseIntent(context(), fixture([{ ...files[0], previous_filename: 'src/business.ts' }, files[1]]).read))
       .rejects.toThrow('TEST_RELEASE_PLAN_UPDATE_REQUIRED');

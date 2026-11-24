@@ -9,9 +9,9 @@ Mastra 的类型、上下文、注册和生命周期留在运行时集成层；�
 替换实现时，核实调用方后移除废弃入口和配置。需继续支持的兼容逻辑要有明确的调用方和测试。
 
 发布准备使用 `.agents/skills/huahuo-release/SKILL.md` 和 `docs/runbooks/standard-release.md`。
-本地开发分支为 `test`；业务通过 PR 合入 test，准确提交的 Agent CI 成功后由受保护 main 自动发布测试环境。main 由 owner 合并。
+本地开发分支为 `test`。业务通过 PR 合入 test，合入后运行 Agent CI。测试 ACK 发布由独立流程接入，main 由 owner 合并。
 实际权限以 GitHub rulesets/environment 为准，不把仓库文件存在当成已生效。
-目标仅为已授权测试机的 `/root/huahuo-agent`、独立 Compose 项目及云助手命令，不操作 Server 容器、其他项目、Nginx 或证书。
+操作范围仅为阿里云账号 `1472289886746775` 内已授权的 Agent 测试资源，不操作 Server 容器、其他项目、Nginx 或证书。
 
 Mastra PostgreSQL 表由框架启动时管理；不能把旧的 `migrations/` RAG SQL 当成运行服务迁移自动执行。
 发布基准取宿主实际成功记录；没有部署记录用 null，不以 Git 分支头代替。
