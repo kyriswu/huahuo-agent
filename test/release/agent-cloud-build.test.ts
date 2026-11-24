@@ -91,8 +91,8 @@ describe('Cloud Assistant build OIDC precheck', () => {
   const repo = 'kyriswu/huahuo-agent';
   const env = {
     ...target,
-    AGENT_BUILD_OIDC_PROVIDER_ARN: 'acs:ram::1234567890123456:oidc-provider/github',
-    AGENT_BUILD_ROLE_ARN: 'acs:ram::1234567890123456:role/agent-builder',
+    GITHUB_OIDC_PROVIDER_ARN: 'acs:ram::1472289886746775:oidc-provider/github-actions',
+    AGENT_BUILD_ROLE_ARN: 'acs:ram::1472289886746775:role/agent-builder',
     GITHUB_REPOSITORY: repo,
     GITHUB_REF: 'refs/heads/main',
     GITHUB_REF_PROTECTED: 'true',
@@ -129,6 +129,19 @@ describe('Cloud Assistant build OIDC precheck', () => {
     const fetch = request();
     await expect(verifyCloudBuildOidc({ ...env, AGENT_BUILD_ROLE_ARN: 'acs:ram::9876543210123456:role/agent-builder' }, fetch))
       .rejects.toThrow('AGENT_BUILD_CLOUD_ROLE_INVALID');
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { GITHUB_OIDC_PROVIDER_ARN: 'acs:ram::1472289886746775:oidc-provider/other' },
+    {
+      GITHUB_OIDC_PROVIDER_ARN: 'acs:ram::1234567890123456:oidc-provider/github-actions',
+      AGENT_BUILD_ROLE_ARN: 'acs:ram::1234567890123456:role/agent-builder',
+    },
+    { AGENT_BUILD_ROLE_ARN: 'acs:ram::1472289886746775:role/agent-builder\n' },
+  ])('rejects any other provider and invalid test role ARNs (%j)', async (patch) => {
+    const fetch = request();
+    await expect(verifyCloudBuildOidc({ ...env, ...patch }, fetch)).rejects.toThrow('AGENT_BUILD_CLOUD_ROLE_INVALID');
     expect(fetch).not.toHaveBeenCalled();
   });
 
