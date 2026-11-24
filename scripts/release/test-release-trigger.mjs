@@ -6,10 +6,9 @@ import { reviewReleasePlan, validateReleasePlan } from './release-plan.mjs';
 const fail = code => { throw Error(code); };
 const controlFiles = new Set([
   '.github/workflows/agent-ci.yml', 'scripts/release/release-plan.mjs', 'test/release/release-plan.test.ts',
-  '.github/workflows/test-server-release.yml', '.github/workflows/main-release-readiness.yml',
+  '.github/workflows/main-release-readiness.yml',
   'scripts/release/release-events.mjs', 'scripts/release/test-release-source.mjs',
   'scripts/release/test-release-trigger.mjs', 'scripts/release/main-release-readiness.mjs',
-  'scripts/release/invoke-cloud-release.mjs', 'test/release/cloud-release.test.ts',
   'test/release/test-release-source.test.ts', 'test/release/release-events.test.ts',
   'test/release/test-release-trigger.test.ts', 'test/release/main-release-readiness.test.ts',
 ]);
